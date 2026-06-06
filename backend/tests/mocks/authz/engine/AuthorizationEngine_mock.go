@@ -8,6 +8,7 @@ import (
 	"context"
 
 	mock "github.com/stretchr/testify/mock"
+	"github.com/thunder-id/thunderid/internal/authz/engine"
 )
 
 // NewAuthorizationEngineMock creates a new instance of AuthorizationEngineMock. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -37,82 +38,138 @@ func (_m *AuthorizationEngineMock) EXPECT() *AuthorizationEngineMock_Expecter {
 	return &AuthorizationEngineMock_Expecter{mock: &_m.Mock}
 }
 
-// GetAuthorizedPermissions provides a mock function for the type AuthorizationEngineMock
-func (_mock *AuthorizationEngineMock) GetAuthorizedPermissions(ctx context.Context, entityID string, groupIDs []string, requestedPermissions []string) ([]string, error) {
-	ret := _mock.Called(ctx, entityID, groupIDs, requestedPermissions)
+// EvaluateAccess provides a mock function for the type AuthorizationEngineMock
+func (_mock *AuthorizationEngineMock) EvaluateAccess(ctx context.Context, request engine.AccessEvaluationRequest) (*engine.AccessEvaluationResponse, error) {
+	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAuthorizedPermissions")
+		panic("no return value specified for EvaluateAccess")
 	}
 
-	var r0 []string
+	var r0 *engine.AccessEvaluationResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string) ([]string, error)); ok {
-		return returnFunc(ctx, entityID, groupIDs, requestedPermissions)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, engine.AccessEvaluationRequest) (*engine.AccessEvaluationResponse, error)); ok {
+		return returnFunc(ctx, request)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string) []string); ok {
-		r0 = returnFunc(ctx, entityID, groupIDs, requestedPermissions)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, engine.AccessEvaluationRequest) *engine.AccessEvaluationResponse); ok {
+		r0 = returnFunc(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).(*engine.AccessEvaluationResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []string, []string) error); ok {
-		r1 = returnFunc(ctx, entityID, groupIDs, requestedPermissions)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, engine.AccessEvaluationRequest) error); ok {
+		r1 = returnFunc(ctx, request)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// AuthorizationEngineMock_GetAuthorizedPermissions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuthorizedPermissions'
-type AuthorizationEngineMock_GetAuthorizedPermissions_Call struct {
+// AuthorizationEngineMock_EvaluateAccess_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EvaluateAccess'
+type AuthorizationEngineMock_EvaluateAccess_Call struct {
 	*mock.Call
 }
 
-// GetAuthorizedPermissions is a helper method to define mock.On call
+// EvaluateAccess is a helper method to define mock.On call
 //   - ctx context.Context
-//   - entityID string
-//   - groupIDs []string
-//   - requestedPermissions []string
-func (_e *AuthorizationEngineMock_Expecter) GetAuthorizedPermissions(ctx interface{}, entityID interface{}, groupIDs interface{}, requestedPermissions interface{}) *AuthorizationEngineMock_GetAuthorizedPermissions_Call {
-	return &AuthorizationEngineMock_GetAuthorizedPermissions_Call{Call: _e.mock.On("GetAuthorizedPermissions", ctx, entityID, groupIDs, requestedPermissions)}
+//   - request engine.AccessEvaluationRequest
+func (_e *AuthorizationEngineMock_Expecter) EvaluateAccess(ctx interface{}, request interface{}) *AuthorizationEngineMock_EvaluateAccess_Call {
+	return &AuthorizationEngineMock_EvaluateAccess_Call{Call: _e.mock.On("EvaluateAccess", ctx, request)}
 }
 
-func (_c *AuthorizationEngineMock_GetAuthorizedPermissions_Call) Run(run func(ctx context.Context, entityID string, groupIDs []string, requestedPermissions []string)) *AuthorizationEngineMock_GetAuthorizedPermissions_Call {
+func (_c *AuthorizationEngineMock_EvaluateAccess_Call) Run(run func(ctx context.Context, request engine.AccessEvaluationRequest)) *AuthorizationEngineMock_EvaluateAccess_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 engine.AccessEvaluationRequest
 		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 []string
-		if args[2] != nil {
-			arg2 = args[2].([]string)
-		}
-		var arg3 []string
-		if args[3] != nil {
-			arg3 = args[3].([]string)
+			arg1 = args[1].(engine.AccessEvaluationRequest)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
-			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *AuthorizationEngineMock_GetAuthorizedPermissions_Call) Return(strings []string, err error) *AuthorizationEngineMock_GetAuthorizedPermissions_Call {
-	_c.Call.Return(strings, err)
+func (_c *AuthorizationEngineMock_EvaluateAccess_Call) Return(accessEvaluationResponse *engine.AccessEvaluationResponse, err error) *AuthorizationEngineMock_EvaluateAccess_Call {
+	_c.Call.Return(accessEvaluationResponse, err)
 	return _c
 }
 
-func (_c *AuthorizationEngineMock_GetAuthorizedPermissions_Call) RunAndReturn(run func(ctx context.Context, entityID string, groupIDs []string, requestedPermissions []string) ([]string, error)) *AuthorizationEngineMock_GetAuthorizedPermissions_Call {
+func (_c *AuthorizationEngineMock_EvaluateAccess_Call) RunAndReturn(run func(ctx context.Context, request engine.AccessEvaluationRequest) (*engine.AccessEvaluationResponse, error)) *AuthorizationEngineMock_EvaluateAccess_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// EvaluateAccessBatch provides a mock function for the type AuthorizationEngineMock
+func (_mock *AuthorizationEngineMock) EvaluateAccessBatch(ctx context.Context, request engine.AccessEvaluationsRequest) (*engine.AccessEvaluationsResponse, error) {
+	ret := _mock.Called(ctx, request)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EvaluateAccessBatch")
+	}
+
+	var r0 *engine.AccessEvaluationsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, engine.AccessEvaluationsRequest) (*engine.AccessEvaluationsResponse, error)); ok {
+		return returnFunc(ctx, request)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, engine.AccessEvaluationsRequest) *engine.AccessEvaluationsResponse); ok {
+		r0 = returnFunc(ctx, request)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*engine.AccessEvaluationsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, engine.AccessEvaluationsRequest) error); ok {
+		r1 = returnFunc(ctx, request)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AuthorizationEngineMock_EvaluateAccessBatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EvaluateAccessBatch'
+type AuthorizationEngineMock_EvaluateAccessBatch_Call struct {
+	*mock.Call
+}
+
+// EvaluateAccessBatch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - request engine.AccessEvaluationsRequest
+func (_e *AuthorizationEngineMock_Expecter) EvaluateAccessBatch(ctx interface{}, request interface{}) *AuthorizationEngineMock_EvaluateAccessBatch_Call {
+	return &AuthorizationEngineMock_EvaluateAccessBatch_Call{Call: _e.mock.On("EvaluateAccessBatch", ctx, request)}
+}
+
+func (_c *AuthorizationEngineMock_EvaluateAccessBatch_Call) Run(run func(ctx context.Context, request engine.AccessEvaluationsRequest)) *AuthorizationEngineMock_EvaluateAccessBatch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 engine.AccessEvaluationsRequest
+		if args[1] != nil {
+			arg1 = args[1].(engine.AccessEvaluationsRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *AuthorizationEngineMock_EvaluateAccessBatch_Call) Return(accessEvaluationsResponse *engine.AccessEvaluationsResponse, err error) *AuthorizationEngineMock_EvaluateAccessBatch_Call {
+	_c.Call.Return(accessEvaluationsResponse, err)
+	return _c
+}
+
+func (_c *AuthorizationEngineMock_EvaluateAccessBatch_Call) RunAndReturn(run func(ctx context.Context, request engine.AccessEvaluationsRequest) (*engine.AccessEvaluationsResponse, error)) *AuthorizationEngineMock_EvaluateAccessBatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -96,20 +96,25 @@ func TestAuthorizationExecutor_Execute_Success(t *testing.T) {
 		},
 	}
 
-	expectedAuthorizedPerms := []string{"read:documents", "write:documents"}
-	mockAuthzService.On("GetAuthorizedPermissions",
+	mockAuthzService.On("EvaluateAccessBatch",
 		mock.Anything,
-		mock.MatchedBy(func(req authzsvc.GetAuthorizedPermissionsRequest) bool {
-			return req.EntityID == "user123" &&
-				len(req.GroupIDs) == 2 &&
-				req.GroupIDs[0] == "group1" &&
-				req.GroupIDs[1] == "group2" &&
-				len(req.RequestedPermissions) == 3 &&
-				req.RequestedPermissions[0] == "read:documents" &&
-				req.RequestedPermissions[1] == "write:documents" &&
-				req.RequestedPermissions[2] == "delete:documents"
-		})).Return(&authzsvc.GetAuthorizedPermissionsResponse{
-		AuthorizedPermissions: expectedAuthorizedPerms,
+		mock.MatchedBy(func(req authzsvc.AccessEvaluationsRequest) bool {
+			return len(req.Evaluations) == 3 &&
+				req.Evaluations[0].Subject.ID == "user123" &&
+				len(req.Evaluations[0].Subject.GroupIDs) == 2 &&
+				req.Evaluations[0].Subject.GroupIDs[0] == "group1" &&
+				req.Evaluations[0].Subject.GroupIDs[1] == "group2" &&
+				req.Evaluations[0].Resource.Type == "" &&
+				req.Evaluations[0].Resource.ID == "" &&
+				req.Evaluations[0].Action.Name == "read:documents" &&
+				req.Evaluations[1].Action.Name == "write:documents" &&
+				req.Evaluations[2].Action.Name == "delete:documents"
+		})).Return(&authzsvc.AccessEvaluationsResponse{
+		Evaluations: []authzsvc.AccessEvaluationResponse{
+			{Decision: true},
+			{Decision: true},
+			{Decision: false},
+		},
 	}, nil)
 
 	// Execute
@@ -146,9 +151,13 @@ func TestAuthorizationExecutor_Execute_PartialPermissions(t *testing.T) {
 		[]entityprovider.EntityGroup{}, nil)
 
 	// User only has read permission
-	mockAuthzService.On("GetAuthorizedPermissions", mock.Anything, mock.Anything).Return(
-		&authzsvc.GetAuthorizedPermissionsResponse{
-			AuthorizedPermissions: []string{"read:documents"},
+	mockAuthzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).Return(
+		&authzsvc.AccessEvaluationsResponse{
+			Evaluations: []authzsvc.AccessEvaluationResponse{
+				{Decision: true},
+				{Decision: false},
+				{Decision: false},
+			},
 		}, nil)
 
 	// Execute
@@ -184,9 +193,12 @@ func TestAuthorizationExecutor_Execute_NoPermissions(t *testing.T) {
 	mockEntityProvider.On("GetTransitiveEntityGroups", "user123").Return(
 		[]entityprovider.EntityGroup{}, nil)
 
-	mockAuthzService.On("GetAuthorizedPermissions", mock.Anything, mock.Anything).Return(
-		&authzsvc.GetAuthorizedPermissionsResponse{
-			AuthorizedPermissions: []string{},
+	mockAuthzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).Return(
+		&authzsvc.AccessEvaluationsResponse{
+			Evaluations: []authzsvc.AccessEvaluationResponse{
+				{Decision: false},
+				{Decision: false},
+			},
 		}, nil)
 
 	// Execute
@@ -225,7 +237,7 @@ func TestAuthorizationExecutor_Execute_NotAuthenticated(t *testing.T) {
 	assert.Equal(t, failureReasonUserNotAuthenticated, resp.FailureReason)
 
 	// Service should NOT be called
-	mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+	mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 }
 
 func TestAuthorizationExecutor_Execute_ServiceError(t *testing.T) {
@@ -249,7 +261,7 @@ func TestAuthorizationExecutor_Execute_ServiceError(t *testing.T) {
 	mockEntityProvider.On("GetTransitiveEntityGroups", "user123").Return(
 		[]entityprovider.EntityGroup{}, nil)
 
-	mockAuthzService.On("GetAuthorizedPermissions", mock.Anything, mock.Anything).Return(
+	mockAuthzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).Return(
 		nil, &serviceerror.ServiceError{
 			Error: i18ncore.I18nMessage{Key: "error.test.service_error", DefaultValue: "service error"},
 		})
@@ -297,7 +309,7 @@ func TestAuthorizationExecutor_Execute_GroupExtractionError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 
-	mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+	mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 	mockEntityProvider.AssertExpectations(t)
 }
 
@@ -328,7 +340,7 @@ func TestAuthorizationExecutor_Execute_NoRequestedPermissions(t *testing.T) {
 	assert.Empty(t, resp.RuntimeData[authorizedPermissionsKey])
 
 	// Service should NOT be called
-	mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+	mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 }
 
 func TestAuthorizationExecutor_ExtractGroupIDs_FromAttributes(t *testing.T) {
@@ -512,16 +524,21 @@ func TestAuthorizationExecutor_Execute_WithMultipleGroups(t *testing.T) {
 		},
 	}
 
-	mockAuthzService.On("GetAuthorizedPermissions",
+	mockAuthzService.On("EvaluateAccessBatch",
 		mock.Anything,
-		mock.MatchedBy(func(req authzsvc.GetAuthorizedPermissionsRequest) bool {
-			return req.EntityID == "user123" &&
-				len(req.GroupIDs) == 3 &&
-				req.GroupIDs[0] == "admin" &&
-				req.GroupIDs[1] == "editor" &&
-				req.GroupIDs[2] == "viewer"
-		})).Return(&authzsvc.GetAuthorizedPermissionsResponse{
-		AuthorizedPermissions: []string{"read:documents", "write:documents", "delete:documents"},
+		mock.MatchedBy(func(req authzsvc.AccessEvaluationsRequest) bool {
+			return len(req.Evaluations) == 3 &&
+				req.Evaluations[0].Subject.ID == "user123" &&
+				len(req.Evaluations[0].Subject.GroupIDs) == 3 &&
+				req.Evaluations[0].Subject.GroupIDs[0] == "admin" &&
+				req.Evaluations[0].Subject.GroupIDs[1] == "editor" &&
+				req.Evaluations[0].Subject.GroupIDs[2] == "viewer"
+		})).Return(&authzsvc.AccessEvaluationsResponse{
+		Evaluations: []authzsvc.AccessEvaluationResponse{
+			{Decision: true},
+			{Decision: true},
+			{Decision: true},
+		},
 	}, nil)
 
 	// Execute
@@ -594,7 +611,7 @@ func TestAuthorizationExecutor_Execute_RegistrationFlow_UnauthenticatedWithoutPe
 	assert.Empty(t, resp.RuntimeData[authorizedPermissionsKey])
 
 	// Service should NOT be called since there are no requested permissions
-	mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+	mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 }
 
 func TestAuthorizationExecutor_Execute_RegistrationFlow_UnauthenticatedWithPermissions(t *testing.T) {
@@ -623,7 +640,7 @@ func TestAuthorizationExecutor_Execute_RegistrationFlow_UnauthenticatedWithPermi
 	assert.Equal(t, common.ExecComplete, resp.Status)
 	assert.Equal(t, "", resp.RuntimeData[authorizedPermissionsKey])
 
-	mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+	mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 }
 
 func TestAuthorizationExecutor_Execute_RegistrationFlow_AuthenticatedWithPermissions(t *testing.T) {
@@ -648,16 +665,18 @@ func TestAuthorizationExecutor_Execute_RegistrationFlow_AuthenticatedWithPermiss
 		},
 	}
 
-	expectedAuthorizedPerms := []string{"read:profile"}
-	mockAuthzService.On("GetAuthorizedPermissions",
+	mockAuthzService.On("EvaluateAccessBatch",
 		mock.Anything,
-		mock.MatchedBy(func(req authzsvc.GetAuthorizedPermissionsRequest) bool {
-			return req.EntityID == existingUserID &&
-				len(req.GroupIDs) == 1 &&
-				req.GroupIDs[0] == "new-users" &&
-				len(req.RequestedPermissions) == 2
-		})).Return(&authzsvc.GetAuthorizedPermissionsResponse{
-		AuthorizedPermissions: expectedAuthorizedPerms,
+		mock.MatchedBy(func(req authzsvc.AccessEvaluationsRequest) bool {
+			return len(req.Evaluations) == 2 &&
+				req.Evaluations[0].Subject.ID == existingUserID &&
+				len(req.Evaluations[0].Subject.GroupIDs) == 1 &&
+				req.Evaluations[0].Subject.GroupIDs[0] == "new-users"
+		})).Return(&authzsvc.AccessEvaluationsResponse{
+		Evaluations: []authzsvc.AccessEvaluationResponse{
+			{Decision: true},
+			{Decision: false},
+		},
 	}, nil)
 
 	// Execute
@@ -713,7 +732,7 @@ func TestAuthorizationExecutor_Execute_NonRegistrationFlow_UnauthenticatedShould
 			assert.Equal(t, failureReasonUserNotAuthenticated, resp.FailureReason)
 
 			// Service should NOT be called
-			mockAuthzService.AssertNotCalled(t, "GetAuthorizedPermissions")
+			mockAuthzService.AssertNotCalled(t, "EvaluateAccessBatch")
 		})
 	}
 }

@@ -39,27 +39,27 @@ func (_m *AuthorizationServiceInterfaceMock) EXPECT() *AuthorizationServiceInter
 	return &AuthorizationServiceInterfaceMock_Expecter{mock: &_m.Mock}
 }
 
-// GetAuthorizedPermissions provides a mock function for the type AuthorizationServiceInterfaceMock
-func (_mock *AuthorizationServiceInterfaceMock) GetAuthorizedPermissions(ctx context.Context, request authz.GetAuthorizedPermissionsRequest) (*authz.GetAuthorizedPermissionsResponse, *serviceerror.ServiceError) {
+// EvaluateAccess provides a mock function for the type AuthorizationServiceInterfaceMock
+func (_mock *AuthorizationServiceInterfaceMock) EvaluateAccess(ctx context.Context, request authz.AccessEvaluationRequest) (*authz.AccessEvaluationResponse, *serviceerror.ServiceError) {
 	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAuthorizedPermissions")
+		panic("no return value specified for EvaluateAccess")
 	}
 
-	var r0 *authz.GetAuthorizedPermissionsResponse
+	var r0 *authz.AccessEvaluationResponse
 	var r1 *serviceerror.ServiceError
-	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.GetAuthorizedPermissionsRequest) (*authz.GetAuthorizedPermissionsResponse, *serviceerror.ServiceError)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.AccessEvaluationRequest) (*authz.AccessEvaluationResponse, *serviceerror.ServiceError)); ok {
 		return returnFunc(ctx, request)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.GetAuthorizedPermissionsRequest) *authz.GetAuthorizedPermissionsResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.AccessEvaluationRequest) *authz.AccessEvaluationResponse); ok {
 		r0 = returnFunc(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*authz.GetAuthorizedPermissionsResponse)
+			r0 = ret.Get(0).(*authz.AccessEvaluationResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, authz.GetAuthorizedPermissionsRequest) *serviceerror.ServiceError); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, authz.AccessEvaluationRequest) *serviceerror.ServiceError); ok {
 		r1 = returnFunc(ctx, request)
 	} else {
 		if ret.Get(1) != nil {
@@ -69,27 +69,27 @@ func (_mock *AuthorizationServiceInterfaceMock) GetAuthorizedPermissions(ctx con
 	return r0, r1
 }
 
-// AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuthorizedPermissions'
-type AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call struct {
+// AuthorizationServiceInterfaceMock_EvaluateAccess_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EvaluateAccess'
+type AuthorizationServiceInterfaceMock_EvaluateAccess_Call struct {
 	*mock.Call
 }
 
-// GetAuthorizedPermissions is a helper method to define mock.On call
+// EvaluateAccess is a helper method to define mock.On call
 //   - ctx context.Context
-//   - request authz.GetAuthorizedPermissionsRequest
-func (_e *AuthorizationServiceInterfaceMock_Expecter) GetAuthorizedPermissions(ctx interface{}, request interface{}) *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call {
-	return &AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call{Call: _e.mock.On("GetAuthorizedPermissions", ctx, request)}
+//   - request authz.AccessEvaluationRequest
+func (_e *AuthorizationServiceInterfaceMock_Expecter) EvaluateAccess(ctx interface{}, request interface{}) *AuthorizationServiceInterfaceMock_EvaluateAccess_Call {
+	return &AuthorizationServiceInterfaceMock_EvaluateAccess_Call{Call: _e.mock.On("EvaluateAccess", ctx, request)}
 }
 
-func (_c *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call) Run(run func(ctx context.Context, request authz.GetAuthorizedPermissionsRequest)) *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call {
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccess_Call) Run(run func(ctx context.Context, request authz.AccessEvaluationRequest)) *AuthorizationServiceInterfaceMock_EvaluateAccess_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 authz.GetAuthorizedPermissionsRequest
+		var arg1 authz.AccessEvaluationRequest
 		if args[1] != nil {
-			arg1 = args[1].(authz.GetAuthorizedPermissionsRequest)
+			arg1 = args[1].(authz.AccessEvaluationRequest)
 		}
 		run(
 			arg0,
@@ -99,12 +99,82 @@ func (_c *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call) Run(r
 	return _c
 }
 
-func (_c *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call) Return(getAuthorizedPermissionsResponse *authz.GetAuthorizedPermissionsResponse, serviceError *serviceerror.ServiceError) *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call {
-	_c.Call.Return(getAuthorizedPermissionsResponse, serviceError)
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccess_Call) Return(accessEvaluationResponse *authz.AccessEvaluationResponse, serviceError *serviceerror.ServiceError) *AuthorizationServiceInterfaceMock_EvaluateAccess_Call {
+	_c.Call.Return(accessEvaluationResponse, serviceError)
 	return _c
 }
 
-func (_c *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call) RunAndReturn(run func(ctx context.Context, request authz.GetAuthorizedPermissionsRequest) (*authz.GetAuthorizedPermissionsResponse, *serviceerror.ServiceError)) *AuthorizationServiceInterfaceMock_GetAuthorizedPermissions_Call {
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccess_Call) RunAndReturn(run func(ctx context.Context, request authz.AccessEvaluationRequest) (*authz.AccessEvaluationResponse, *serviceerror.ServiceError)) *AuthorizationServiceInterfaceMock_EvaluateAccess_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// EvaluateAccessBatch provides a mock function for the type AuthorizationServiceInterfaceMock
+func (_mock *AuthorizationServiceInterfaceMock) EvaluateAccessBatch(ctx context.Context, request authz.AccessEvaluationsRequest) (*authz.AccessEvaluationsResponse, *serviceerror.ServiceError) {
+	ret := _mock.Called(ctx, request)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EvaluateAccessBatch")
+	}
+
+	var r0 *authz.AccessEvaluationsResponse
+	var r1 *serviceerror.ServiceError
+	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.AccessEvaluationsRequest) (*authz.AccessEvaluationsResponse, *serviceerror.ServiceError)); ok {
+		return returnFunc(ctx, request)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, authz.AccessEvaluationsRequest) *authz.AccessEvaluationsResponse); ok {
+		r0 = returnFunc(ctx, request)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*authz.AccessEvaluationsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, authz.AccessEvaluationsRequest) *serviceerror.ServiceError); ok {
+		r1 = returnFunc(ctx, request)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*serviceerror.ServiceError)
+		}
+	}
+	return r0, r1
+}
+
+// AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EvaluateAccessBatch'
+type AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call struct {
+	*mock.Call
+}
+
+// EvaluateAccessBatch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - request authz.AccessEvaluationsRequest
+func (_e *AuthorizationServiceInterfaceMock_Expecter) EvaluateAccessBatch(ctx interface{}, request interface{}) *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call {
+	return &AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call{Call: _e.mock.On("EvaluateAccessBatch", ctx, request)}
+}
+
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call) Run(run func(ctx context.Context, request authz.AccessEvaluationsRequest)) *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 authz.AccessEvaluationsRequest
+		if args[1] != nil {
+			arg1 = args[1].(authz.AccessEvaluationsRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call) Return(accessEvaluationsResponse *authz.AccessEvaluationsResponse, serviceError *serviceerror.ServiceError) *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call {
+	_c.Call.Return(accessEvaluationsResponse, serviceError)
+	return _c
+}
+
+func (_c *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call) RunAndReturn(run func(ctx context.Context, request authz.AccessEvaluationsRequest) (*authz.AccessEvaluationsResponse, *serviceerror.ServiceError)) *AuthorizationServiceInterfaceMock_EvaluateAccessBatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

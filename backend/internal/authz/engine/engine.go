@@ -24,12 +24,56 @@ import "context"
 // This interface is NOT exported and is used internally by the authorization service.
 // Different engines can be plugged in (RBAC, ABAC, ReBAC, Custom) by implementing this interface.
 type AuthorizationEngine interface {
-	// GetAuthorizedPermissions returns the subset of requested permissions
-	// that the entity (directly or through groups) is authorized for.
-	GetAuthorizedPermissions(
+	// EvaluateAccess evaluates a single fine-grained access request.
+	EvaluateAccess(
 		ctx context.Context,
-		entityID string,
-		groupIDs []string,
-		requestedPermissions []string,
-	) ([]string, error)
+		request AccessEvaluationRequest,
+	) (*AccessEvaluationResponse, error)
+
+	// EvaluateAccessBatch evaluates multiple fine-grained access requests.
+	EvaluateAccessBatch(
+		ctx context.Context,
+		request AccessEvaluationsRequest,
+	) (*AccessEvaluationsResponse, error)
+}
+
+// Subject identifies the principal for an access evaluation.
+type Subject struct {
+	Type     string
+	ID       string
+	GroupIDs []string
+}
+
+// Resource identifies the protected resource for an access evaluation.
+type Resource struct {
+	Type string
+	ID   string
+}
+
+// Action identifies the operation for an access evaluation.
+type Action struct {
+	Name string
+}
+
+// AccessEvaluationRequest represents a single fine-grained access evaluation request.
+type AccessEvaluationRequest struct {
+	Subject  Subject
+	Resource Resource
+	Action   Action
+	Context  map[string]interface{}
+}
+
+// AccessEvaluationResponse represents a single fine-grained access evaluation response.
+type AccessEvaluationResponse struct {
+	Decision bool
+}
+
+// AccessEvaluationsRequest represents a batched fine-grained access evaluation request.
+type AccessEvaluationsRequest struct {
+	Evaluations []AccessEvaluationRequest
+}
+
+// AccessEvaluationsResponse represents a batched fine-grained access evaluation response.
+type AccessEvaluationsResponse struct {
+	Evaluations []AccessEvaluationResponse
 }

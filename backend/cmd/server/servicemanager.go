@@ -40,6 +40,7 @@ import (
 	"github.com/thunder-id/thunderid/internal/authn/passkey"
 	authnprovidermgr "github.com/thunder-id/thunderid/internal/authnprovider/manager"
 	"github.com/thunder-id/thunderid/internal/authz"
+	"github.com/thunder-id/thunderid/internal/authzen"
 	"github.com/thunder-id/thunderid/internal/cert"
 	"github.com/thunder-id/thunderid/internal/consent"
 	layoutmgt "github.com/thunder-id/thunderid/internal/design/layout/mgt"
@@ -201,6 +202,7 @@ func registerServices(mux *http.ServeMux, cacheManager cache.CacheManagerInterfa
 	}
 	exporters = append(exporters, roleExporter)
 	authZService := authz.Initialize(roleService)
+	authzen.Initialize(mux, authZService, entityProvider, resourceService)
 
 	idpService, idpExporter, err := idp.Initialize(cacheManager, mux)
 	if err != nil {

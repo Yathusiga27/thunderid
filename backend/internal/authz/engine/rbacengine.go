@@ -24,6 +24,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/thunder-id/thunderid/internal/role"
 )
@@ -41,20 +42,50 @@ func NewRBACEngine(roleService role.RoleServiceInterface) AuthorizationEngine {
 	}
 }
 
-// GetAuthorizedPermissions returns the subset of requested permissions
-// that the entity is authorized for based on their role assignments.
-func (e *rbacEngine) GetAuthorizedPermissions(
+// EvaluateAccess evaluates a single fine-grained access request.
+func (e *rbacEngine) EvaluateAccess(
 	ctx context.Context,
-	entityID string,
-	groupIDs []string,
-	requestedPermissions []string,
-) ([]string, error) {
-	// Delegate to role service
-	authorizedPerms, svcErr := e.roleService.GetAuthorizedPermissions(
-		ctx, entityID, groupIDs, requestedPermissions)
-	if svcErr != nil {
-		return nil, fmt.Errorf("role service error: %s", svcErr.Error)
+	request AccessEvaluationRequest,
+) (*AccessEvaluationResponse, error) {
+	response, err := e.EvaluateAccessBatch(ctx, AccessEvaluationsRequest{
+		Evaluations: []AccessEvaluationRequest{request},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(response.Evaluations) == 0 {
+		return &AccessEvaluationResponse{}, nil
+	}
+	return &response.Evaluations[0], nil
+}
+
+// EvaluateAccessBatch evaluates multiple fine-grained access requests based on role assignments.
+func (e *rbacEngine) EvaluateAccessBatch(
+	ctx context.Context,
+	request AccessEvaluationsRequest,
+) (*AccessEvaluationsResponse, error) {
+	if len(request.Evaluations) == 0 {
+		return &AccessEvaluationsResponse{Evaluations: []AccessEvaluationResponse{}}, nil
 	}
 
-	return authorizedPerms, nil
+	evaluations := make([]AccessEvaluationResponse, 0, len(request.Evaluations))
+	for _, evaluation := range request.Evaluations {
+		permission := buildPermission(evaluation)
+		authorizedPerms, svcErr := e.roleService.GetAuthorizedPermissions(
+			ctx, evaluation.Subject.ID, evaluation.Subject.GroupIDs, []string{permission})
+		if svcErr != nil {
+			return nil, fmt.Errorf("role service error: %s", svcErr.Error)
+		}
+		evaluations = append(evaluations, AccessEvaluationResponse{
+			Decision: slices.Contains(authorizedPerms, permission),
+		})
+	}
+	return &AccessEvaluationsResponse{Evaluations: evaluations}, nil
+}
+
+func buildPermission(request AccessEvaluationRequest) string {
+	if request.Resource.Type == "" {
+		return request.Action.Name
+	}
+	return request.Resource.Type + ":" + request.Action.Name
 }

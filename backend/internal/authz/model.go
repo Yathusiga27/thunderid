@@ -18,14 +18,43 @@
 
 package authz
 
-// GetAuthorizedPermissionsRequest represents the request for getting authorized permissions.
-type GetAuthorizedPermissionsRequest struct {
-	EntityID             string   `json:"entityId,omitempty"`
-	GroupIDs             []string `json:"groupIds,omitempty"`
-	RequestedPermissions []string `json:"requestedPermissions"`
+// Subject identifies the principal for an access evaluation.
+type Subject struct {
+	Type     string   `json:"type,omitempty"`
+	ID       string   `json:"id"`
+	GroupIDs []string `json:"groupIds,omitempty"`
 }
 
-// GetAuthorizedPermissionsResponse represents the response with authorized permissions.
-type GetAuthorizedPermissionsResponse struct {
-	AuthorizedPermissions []string `json:"authorizedPermissions"`
+// Resource identifies the protected resource for an access evaluation.
+type Resource struct {
+	Type string `json:"type,omitempty"`
+	ID   string `json:"id,omitempty"`
+}
+
+// Action identifies the operation for an access evaluation.
+type Action struct {
+	Name string `json:"name"`
+}
+
+// AccessEvaluationRequest represents a single fine-grained access evaluation request.
+type AccessEvaluationRequest struct {
+	Subject  Subject                `json:"subject"`
+	Resource Resource               `json:"resource"`
+	Action   Action                 `json:"action"`
+	Context  map[string]interface{} `json:"context,omitempty"`
+}
+
+// AccessEvaluationResponse represents a single fine-grained access evaluation response.
+type AccessEvaluationResponse struct {
+	Decision bool `json:"decision"`
+}
+
+// AccessEvaluationsRequest represents a batched fine-grained access evaluation request.
+type AccessEvaluationsRequest struct {
+	Evaluations []AccessEvaluationRequest `json:"evaluations"`
+}
+
+// AccessEvaluationsResponse represents a batched fine-grained access evaluation response.
+type AccessEvaluationsResponse struct {
+	Evaluations []AccessEvaluationResponse `json:"evaluations"`
 }

@@ -112,14 +112,8 @@ func (a *authorizationExecutor) Execute(ctx *core.NodeContext) (*common.Executor
 		log.Int("groupCount", len(groupIDs)),
 		log.Int("permissionCount", len(requestedPerms)))
 
-	// Call authorization service
-	authzReq := authzsvc.GetAuthorizedPermissionsRequest{
-		EntityID:             userID,
-		GroupIDs:             groupIDs,
-		RequestedPermissions: requestedPerms,
-	}
-
-	authzResp, svcErr := a.authzService.GetAuthorizedPermissions(ctx.Context, authzReq)
+	authzResp, svcErr := a.authzService.EvaluateAccessBatch(ctx.Context,
+		buildAccessEvaluationsRequest(userID, groupIDs, requestedPerms))
 	if svcErr != nil {
 		logger.Error("Authorization service call failed", log.String("error", svcErr.Error.DefaultValue))
 		execResp.Status = common.ExecFailure
@@ -127,9 +121,10 @@ func (a *authorizationExecutor) Execute(ctx *core.NodeContext) (*common.Executor
 		return execResp, nil
 	}
 
-	setAuthorizedPermissions(execResp, authzResp.AuthorizedPermissions)
+	authorizedPermissions := filterAuthorizedPermissions(requestedPerms, authzResp.Evaluations)
+	setAuthorizedPermissions(execResp, authorizedPermissions)
 	logger.Debug("Authorization completed successfully",
-		log.Int("authorizedCount", len(authzResp.AuthorizedPermissions)))
+		log.Int("authorizedCount", len(authorizedPermissions)))
 
 	execResp.Status = common.ExecComplete
 	return execResp, nil
@@ -148,6 +143,37 @@ func extractRequestedPermissions(ctx *core.NodeContext) []string {
 // setAuthorizedPermissions sets the authorized permissions in the executor response's runtime data.
 func setAuthorizedPermissions(execResp *common.ExecutorResponse, authorizedPermissions []string) {
 	execResp.RuntimeData[authorizedPermissionsKey] = utils.StringifyStringArray(authorizedPermissions, " ")
+}
+
+func buildAccessEvaluationsRequest(
+	entityID string,
+	groupIDs []string,
+	requestedPermissions []string,
+) authzsvc.AccessEvaluationsRequest {
+	evaluations := make([]authzsvc.AccessEvaluationRequest, 0, len(requestedPermissions))
+	for _, permission := range requestedPermissions {
+		evaluations = append(evaluations, authzsvc.AccessEvaluationRequest{
+			Subject: authzsvc.Subject{
+				ID:       entityID,
+				GroupIDs: groupIDs,
+			},
+			Action: authzsvc.Action{Name: permission},
+		})
+	}
+	return authzsvc.AccessEvaluationsRequest{Evaluations: evaluations}
+}
+
+func filterAuthorizedPermissions(
+	requestedPermissions []string,
+	evaluations []authzsvc.AccessEvaluationResponse,
+) []string {
+	authorizedPermissions := make([]string, 0, len(evaluations))
+	for i, evaluation := range evaluations {
+		if evaluation.Decision && i < len(requestedPermissions) {
+			authorizedPermissions = append(authorizedPermissions, requestedPermissions[i])
+		}
+	}
+	return authorizedPermissions
 }
 
 // extractGroupIDs extracts group IDs from the authenticated user's attributes or runtime data.

@@ -24,14 +24,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 
+	"github.com/thunder-id/thunderid/internal/authz/engine"
 	"github.com/thunder-id/thunderid/internal/system/error/serviceerror"
 	enginemock "github.com/thunder-id/thunderid/tests/mocks/authz/engine"
-
-	"github.com/stretchr/testify/suite"
 )
 
-// AuthorizationServiceTestSuite is the test suite for authorization service.
 type AuthorizationServiceTestSuite struct {
 	suite.Suite
 	mockEngine *enginemock.AuthorizationEngineMock
@@ -47,198 +46,109 @@ func (suite *AuthorizationServiceTestSuite) SetupTest() {
 	suite.service = newAuthorizationService(suite.mockEngine)
 }
 
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_Success() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1", "group2"},
-		RequestedPermissions: []string{"perm1", "perm2", "perm3"},
+func (suite *AuthorizationServiceTestSuite) TestEvaluateAccessSuccess() {
+	request := AccessEvaluationRequest{
+		Subject:  Subject{ID: "user1", GroupIDs: []string{"group1"}},
+		Resource: Resource{Type: "document", ID: "doc1"},
+		Action:   Action{Name: "read"},
 	}
-	expectedPermissions := []string{"perm1", "perm3"}
 
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(expectedPermissions, nil)
+	suite.mockEngine.On("EvaluateAccessBatch", mock.Anything,
+		mock.MatchedBy(func(req engine.AccessEvaluationsRequest) bool {
+			return len(req.Evaluations) == 1 &&
+				req.Evaluations[0].Subject.ID == "user1" &&
+				req.Evaluations[0].Subject.GroupIDs[0] == "group1" &&
+				req.Evaluations[0].Resource.Type == "document" &&
+				req.Evaluations[0].Resource.ID == "doc1" &&
+				req.Evaluations[0].Action.Name == "read"
+		})).
+		Return(&engine.AccessEvaluationsResponse{
+			Evaluations: []engine.AccessEvaluationResponse{{Decision: true}},
+		}, nil)
 
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
+	response, err := suite.service.EvaluateAccess(context.Background(), request)
 
 	suite.Nil(err)
 	suite.NotNil(response)
-	suite.Equal(expectedPermissions, response.AuthorizedPermissions)
+	suite.True(response.Decision)
 }
 
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_MissingBothUserAndGroups() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "",
-		GroupIDs:             []string{},
-		RequestedPermissions: []string{"perm1", "perm2"},
+func (suite *AuthorizationServiceTestSuite) TestEvaluateAccessBatchSuccess() {
+	request := AccessEvaluationsRequest{
+		Evaluations: []AccessEvaluationRequest{
+			{
+				Subject:  Subject{ID: "user1", GroupIDs: []string{"group1"}},
+				Resource: Resource{Type: "document", ID: "doc1"},
+				Action:   Action{Name: "read"},
+			},
+			{
+				Subject:  Subject{ID: "user1", GroupIDs: []string{"group1"}},
+				Resource: Resource{Type: "document", ID: "doc2"},
+				Action:   Action{Name: "delete"},
+			},
+		},
 	}
 
-	// Mock engine to return error (validation happens in underlying service)
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(nil, errors.New("role service error: Either userId or groups must be provided"))
+	suite.mockEngine.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return(&engine.AccessEvaluationsResponse{
+			Evaluations: []engine.AccessEvaluationResponse{
+				{Decision: true},
+				{Decision: false},
+			},
+		}, nil)
 
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
+	response, err := suite.service.EvaluateAccessBatch(context.Background(), request)
+
+	suite.Nil(err)
+	suite.NotNil(response)
+	suite.Len(response.Evaluations, 2)
+	suite.True(response.Evaluations[0].Decision)
+	suite.False(response.Evaluations[1].Decision)
+}
+
+func (suite *AuthorizationServiceTestSuite) TestEvaluateAccessBatchEmpty() {
+	response, err := suite.service.EvaluateAccessBatch(context.Background(), AccessEvaluationsRequest{})
+
+	suite.Nil(err)
+	suite.NotNil(response)
+	suite.Empty(response.Evaluations)
+	suite.mockEngine.AssertNotCalled(suite.T(), "EvaluateAccessBatch")
+}
+
+func (suite *AuthorizationServiceTestSuite) TestEvaluateAccessBatchEngineError() {
+	request := AccessEvaluationsRequest{
+		Evaluations: []AccessEvaluationRequest{
+			{
+				Subject:  Subject{ID: "user1"},
+				Resource: Resource{Type: "document", ID: "doc1"},
+				Action:   Action{Name: "read"},
+			},
+		},
+	}
+
+	suite.mockEngine.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return((*engine.AccessEvaluationsResponse)(nil), errors.New("engine failed"))
+
+	response, err := suite.service.EvaluateAccessBatch(context.Background(), request)
 
 	suite.Nil(response)
 	suite.NotNil(err)
 	suite.Equal(serviceerror.InternalServerError.Code, err.Code)
 }
 
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_MissingBothUserAndNilGroups() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "",
-		GroupIDs:             nil,
-		RequestedPermissions: []string{"perm1", "perm2"},
+func (suite *AuthorizationServiceTestSuite) TestEvaluateAccessEmptyEngineResponse() {
+	request := AccessEvaluationRequest{
+		Subject:  Subject{ID: "user1"},
+		Resource: Resource{Type: "document", ID: "doc1"},
+		Action:   Action{Name: "read"},
 	}
 
-	// Mock engine to return error (validation happens in underlying service)
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, []string{},
-		request.RequestedPermissions).
-		Return(nil, errors.New("role service error: Either userId or groups must be provided"))
+	suite.mockEngine.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return(&engine.AccessEvaluationsResponse{}, nil)
 
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(response)
-	suite.NotNil(err)
-	suite.Equal(serviceerror.InternalServerError.Code, err.Code)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_EmptyRequestedPermissions() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1"},
-		RequestedPermissions: []string{},
-	}
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
+	response, err := suite.service.EvaluateAccess(context.Background(), request)
 
 	suite.Nil(err)
 	suite.NotNil(response)
-	suite.Empty(response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_NilRequestedPermissions() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1"},
-		RequestedPermissions: nil,
-	}
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Empty(response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_UserOnly() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{},
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-	expectedPermissions := []string{"perm1"}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(expectedPermissions, nil)
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Equal(expectedPermissions, response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_GroupsOnly() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "",
-		GroupIDs:             []string{"group1", "group2"},
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-	expectedPermissions := []string{"perm2"}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(expectedPermissions, nil)
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Equal(expectedPermissions, response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_NilGroups() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             nil,
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-	expectedPermissions := []string{"perm1"}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, []string{},
-		request.RequestedPermissions).
-		Return(expectedPermissions, nil)
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Equal(expectedPermissions, response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_EngineError() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1"},
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(nil, errors.New("engine failed"))
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(response)
-	suite.NotNil(err)
-	suite.Equal(serviceerror.InternalServerError.Code, err.Code)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_NoAuthorizedPermissions() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1"},
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return([]string{}, nil)
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Empty(response.AuthorizedPermissions)
-}
-
-func (suite *AuthorizationServiceTestSuite) TestGetAuthorizedPermissions_AllPermissionsAuthorized() {
-	request := GetAuthorizedPermissionsRequest{
-		EntityID:             "user1",
-		GroupIDs:             []string{"group1"},
-		RequestedPermissions: []string{"perm1", "perm2"},
-	}
-
-	suite.mockEngine.On("GetAuthorizedPermissions", mock.Anything, request.EntityID, request.GroupIDs,
-		request.RequestedPermissions).
-		Return(request.RequestedPermissions, nil)
-
-	response, err := suite.service.GetAuthorizedPermissions(context.Background(), request)
-
-	suite.Nil(err)
-	suite.NotNil(response)
-	suite.Equal(request.RequestedPermissions, response.AuthorizedPermissions)
+	suite.False(response.Decision)
 }
