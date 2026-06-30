@@ -808,6 +808,23 @@ const sidebars: SidebarsConfig = {
                 },
               ],
             },
+            {
+              type: 'category',
+              label: 'AuthZEN',
+              collapsed: true,
+              collapsible: true,
+              link: {
+                type: 'doc',
+                id: 'guides/guides/protocols/authzen/index',
+              },
+              items: [
+                {
+                  type: 'doc',
+                  id: 'guides/guides/protocols/authzen/pdp',
+                  label: 'Policy Decision Point',
+                },
+              ],
+            },
           ],
         },
       ],
