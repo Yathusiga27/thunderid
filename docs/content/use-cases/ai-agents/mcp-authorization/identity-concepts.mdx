@@ -45,6 +45,23 @@ Each MCP tool checks for the same scope its REST counterpart checks for:
 
 See [Resource Servers](/docs/next/guides/guides/resource-servers).
 
+## AuthZEN Authorization Mode
+
+The Wayfinder MCP server supports two authorization modes for protected MCP tools:
+
+- `scope` mode, the default, checks whether the incoming MCP access token carries the required permission.
+- `authzen` mode sends an AuthZEN access evaluation request to the <ProductName /> PDP and uses the returned allow or deny decision.
+
+In `authzen` mode, the Wayfinder Server still validates the incoming MCP token. The token identifies the subject, such as `john.doe` or the Wayfinder Concierge agent. The server then sends an AuthZEN request with:
+
+- `subject.id` from the incoming MCP token.
+- `resource.type` set to `wayfinder`.
+- `action.name` set to the complete permission string, such as `wayfinder:booking:recommend`.
+
+The `WAYFINDER-AUTHZEN-CLIENT` application authenticates the Wayfinder Server when it calls the protected AuthZEN API. This application only authorizes the PDP API call. The PDP still evaluates the user or agent from the incoming MCP token.
+
+See [AuthZEN](/docs/next/guides/guides/protocols/authzen).
+
 ## Discovery Endpoint
 
 The Wayfinder MCP server publishes a protected-resource metadata document at `GET /.well-known/oauth-protected-resource`. It points at <ProductName /> as the authorization server and lists the supported scopes. MCP Inspector — and any compatible MCP client — reads this document to start the OAuth flow without manual configuration.

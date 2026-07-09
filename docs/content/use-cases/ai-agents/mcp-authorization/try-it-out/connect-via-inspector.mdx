@@ -1,10 +1,10 @@
 ---
-title: MCP Authorization
+title: Scope-Based MCP Authorization
 description: Connect an external MCP client to the Wayfinder MCP server through {{ProductName}}, then watch scope enforcement deny a privileged tool until the user grants the missing permission at consent.
 sidebar_position: 1
 ---
 
-# MCP Authorization
+# Scope-Based MCP Authorization
 
 In this walkthrough, `john.doe` signs in to MCP Inspector through <ProductName />, picks which `wayfinder:booking:*` permissions to grant, and calls a few MCP tools. Calling a tool he didn't grant a permission for hits a `403`. He reconnects, grants the missing permission, and the same call succeeds.
 

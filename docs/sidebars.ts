@@ -302,7 +302,12 @@ const sidebars: SidebarsConfig = {
                         {
                           type: 'doc',
                           id: 'use-cases/ai-agents/mcp-authorization/try-it-out/connect-via-inspector',
-                          label: 'MCP Authorization',
+                          label: 'Scope-Based MCP Authorization',
+                        },
+                        {
+                          type: 'doc',
+                          id: 'use-cases/ai-agents/mcp-authorization/try-it-out/authzen-authorization',
+                          label: 'AuthZEN-Based MCP Authorization',
                         },
                       ],
                     },

@@ -33,6 +33,22 @@ The walkthrough relies on the consent screen at sign-in to narrow what the exter
 If you don't want to register every MCP client up-front, <ProductName /> also supports [Dynamic Client Registration](/docs/next/guides/guides/protocols/oauth-oidc/dynamic-client-registration). An MCP client that supports DCR can discover <ProductName /> through the MCP server's protected-resource metadata and register itself, after which it uses its issued credentials for the same authorization-code flow. The tryout uses static registration for predictability — DCR is the right choice when you can't enumerate every client in advance.
 :::
 
+## Register the AuthZEN Client Application
+
+If you want the Wayfinder MCP server to call the <ProductName /> AuthZEN PDP instead of checking token scopes locally, create a confidential application for the server-side PDP call.
+
+Navigate to **Applications** → **Add Application** and choose **Machine-to-Machine App** as the type. Configure:
+
+| Setting        | Value |
+| -------------- | ----- |
+| Client ID      | `WAYFINDER-AUTHZEN-CLIENT` |
+| Client secret  | Use a generated secret and save it for `THUNDERID_AUTHZEN_CLIENT_SECRET` |
+| Allowed grants | `client_credentials` |
+
+Create a role such as `Wayfinder AuthZEN Client` and grant it the `system` permission. Assign that role to `WAYFINDER-AUTHZEN-CLIENT`.
+
+The `system` permission authorizes the confidential application to call the protected AuthZEN API. The application does not receive booking permissions and does not replace the user or agent. The Wayfinder MCP server still uses the incoming MCP token to choose the AuthZEN evaluation subject.
+
 ## Start the Sample
 
 With the new application in place, follow the commands in the Wayfinder sample's <RepoLink path="/tree/main/samples/apps/wayfinder-sample#readme">README</RepoLink>. The MCP server runs as part of the Wayfinder Server process and serves `/mcp` alongside `/api/*` automatically.

@@ -12,7 +12,12 @@ import { WayfinderMcpOrganization, WayfinderMcpArchitecture } from '../../../../
 
 # Try It Out
 
-Each walkthrough below runs the [Securing MCP](../overview) pattern against the Wayfinder sample. The Wayfinder Server hosts an MCP server on `/mcp` alongside its REST API; an external MCP client signs in through <ProductName /> and calls Wayfinder's tools. The server enforces the scopes in the access token before invoking protected tool handlers.
+Each walkthrough below runs the [Securing MCP](../overview) pattern against the Wayfinder sample. The Wayfinder Server hosts an MCP server on `/mcp` alongside its REST API; an external MCP client signs in through <ProductName /> and calls Wayfinder's tools.
+
+The sample supports two MCP tool authorization modes:
+
+- **Scope-based MCP authorization** checks the permissions already present in the incoming access token.
+- **AuthZEN-based MCP authorization** validates the incoming token, then asks the <ProductName /> policy decision point (PDP) for a runtime allow or deny decision before invoking protected tool handlers.
 
 ## Meet Wayfinder
 
@@ -73,9 +78,14 @@ Pick a walkthrough to begin. Each one starts from the setup above.
 
 <NextSteps>
   <NextStepsCard
-    title="MCP Authorization"
+    title="Scope-Based MCP Authorization"
     description="Authorize an external MCP client, list Wayfinder's tools, call a few, and watch scope enforcement deny delete_all_bookings."
     href="./connect-via-inspector"
+  />
+  <NextStepsCard
+    title="AuthZEN-Based MCP Authorization"
+    description="Enable AuthZEN mode and watch the Wayfinder MCP server ask the PDP for runtime tool decisions."
+    href="./authzen-authorization"
   />
 </NextSteps>
 

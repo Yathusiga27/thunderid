@@ -1,0 +1,112 @@
+---
+title: AuthZEN-Based MCP Authorization
+description: Enable AuthZEN mode for the Wayfinder MCP server and request runtime authorization decisions from {{ProductName}}.
+sidebar_position: 2
+---
+
+# AuthZEN-Based MCP Authorization
+
+In this walkthrough, `john.doe` signs in to MCP Inspector through <ProductName /> and calls a protected Wayfinder MCP tool. Instead of trusting only the scopes in the access token, the Wayfinder MCP server asks the <ProductName /> PDP for a runtime AuthZEN decision before it invokes the tool handler.
+
+:::note Prerequisites
+Complete [Set Up Your Environment](../../try-it-out#set-up-your-environment) before starting this walkthrough.
+:::
+
+## Why This Walkthrough Is Separate
+
+The default [scope-based walkthrough](./connect-via-inspector) demonstrates consent narrowing: `john.doe` grants selected `wayfinder:booking:*` permissions, and the MCP server checks those scopes locally.
+
+AuthZEN mode keeps the same OAuth sign-in, MCP protected-resource discovery, and consent screen. The difference is the final MCP tool authorization check:
+
+- Scope-based mode asks: does the token contain the required permission?
+- AuthZEN mode asks: does the PDP allow this subject to perform this action right now?
+
+## Walk Through the Use Case
+
+### 1. Verify the AuthZEN Client
+
+In the <ProductName /> Console at <ConsoleUrl />, open **Applications** and confirm `WAYFINDER-AUTHZEN-CLIENT` is listed.
+
+This confidential application authenticates the Wayfinder Server when it calls the protected AuthZEN API. It does not replace the signed-in user. The user or agent from the incoming MCP token remains the evaluation subject.
+
+### 2. Enable AuthZEN Mode
+
+Update `samples/apps/wayfinder-sample/backend/.env`:
+
+```env
+AUTHORIZATION_MODE=authzen
+THUNDERID_AUTHZEN_CLIENT_ID=WAYFINDER-AUTHZEN-CLIENT
+THUNDERID_AUTHZEN_CLIENT_SECRET=wayfinder-authzen-client-secret
+```
+
+Restart the Wayfinder Server after changing the mode.
+
+### 3. Launch MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+Inspector opens in your browser at `http://localhost:6274`.
+
+### 4. Connect to the Wayfinder MCP Server
+
+In the Inspector UI:
+
+- **Transport type:** Streamable HTTP
+- **URL:** `http://localhost:8787/mcp`
+- **OAuth:** enabled
+
+Open Inspector's **Auth** panel and enter the pre-registered client:
+
+- **Client ID:** `EXTERNAL-MCP-CLIENT`
+- Leave the client secret empty.
+
+Click **Connect**. Inspector discovers <ProductName /> through the Wayfinder MCP server's protected-resource metadata and starts the authorization-code + PKCE flow.
+
+### 5. Sign In as John Doe
+
+Sign in as `john.doe` / `john.doe`.
+
+Approve the consent screen. The OAuth flow and consent screen are the same as the scope-based walkthrough.
+
+### 6. Call a Tool John Is Not Allowed to Use
+
+In Inspector's **Tools** tab, call `recommend_bookings`.
+
+`john.doe` has the `Booking User` role, but not the `Recommender` role. The Wayfinder MCP server validates John's token, builds an AuthZEN request, and asks the PDP whether John can perform `wayfinder:booking:recommend`.
+
+The PDP denies the request, and the tool does not run.
+
+The Wayfinder Server logs the decision:
+
+```text
+[authzen] DENY subject=wayfinder-john-doe resource=wayfinder action=wayfinder:booking:recommend
+```
+
+## Try a Variant
+
+- **Grant the Recommender role to John.** Assign the `Recommender` role to `john.doe`, reconnect Inspector, and call `recommend_bookings` again. The PDP now allows the same action for the same user.
+- **Use the Wayfinder Concierge agent.** Ask the in-product Concierge for recommendations. The Concierge agent has the `Recommender` role, so the backend logs an allow decision for the agent subject:
+
+  ```text
+  [authzen] ALLOW subject=wayfinder-concierge resource=wayfinder action=wayfinder:booking:recommend
+  ```
+
+## What Changed Compared to Scope Mode
+
+Scope-based mode makes the authorization decision from permissions already present in the access token. AuthZEN mode still validates the token, but the MCP server asks <ProductName /> for the current policy decision at request time.
+
+The AuthZEN request uses:
+
+- `subject.id` from the incoming MCP token.
+- `resource.type` set to `wayfinder`.
+- `action.name` set to the complete permission string, such as `wayfinder:booking:recommend`.
+
+The AuthZEN client only authenticates the PDP API call. It does not grant booking permissions to the user or the agent.
+
+## Going Deeper
+
+- Want the default token-scope walkthrough? See [Scope-Based MCP Authorization](./connect-via-inspector).
+- Curious how the AuthZEN client maps to <ProductName /> concepts? See [Identity Concepts](../../identity-concepts#authzen-authorization-mode).
+- Prefer to register the AuthZEN client manually? See [Configure It Yourself](../../configure-it-yourself#register-the-authzen-client-application).
