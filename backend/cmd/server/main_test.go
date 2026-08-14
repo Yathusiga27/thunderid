@@ -49,6 +49,41 @@ func TestCreateSecurityMiddlewareTestSuite(t *testing.T) {
 	suite.Run(t, new(CreateSecurityMiddlewareTestSuite))
 }
 
+func TestValidateExternalAuthZENConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  config.ExternalAuthZENConfig
+		expects string
+	}{
+		{
+			name: "disabled without PDPs",
+		},
+		{
+			name: "enabled with PDPs",
+			config: config.ExternalAuthZENConfig{
+				Enabled: true,
+				PDPs:    []config.ExternalAuthZENPDPConfig{{Endpoint: "http://localhost:3600/access/v1/evaluation"}},
+			},
+		},
+		{
+			name:    "enabled without PDPs",
+			config:  config.ExternalAuthZENConfig{Enabled: true},
+			expects: "no external AuthZEN PDPs are configured",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateExternalAuthZENConfig(test.config)
+			if test.expects == "" {
+				assert.NoError(t, err)
+				return
+			}
+			assert.EqualError(t, err, test.expects)
+		})
+	}
+}
+
 func (suite *CreateSecurityMiddlewareTestSuite) SetupTest() {
 	suite.logger = log.GetLogger()
 	suite.mockJWTService = jwtmock.NewJWTServiceInterfaceMock(suite.T())

@@ -130,6 +130,47 @@ jwt:
 	assert.Equal(suite.T(), dummyCryptoKey, config.Crypto.Encryption.Key) // Default value
 }
 
+func (suite *ConfigTestSuite) TestLoadConfigExternalAuthZENPDPs() {
+	tempDir := suite.T().TempDir()
+	userContent := `
+authorization:
+  external_authzen:
+    enabled: true
+    pdps:
+      - name: pdp-1
+        endpoint: "http://localhost:9000/access/v1/evaluation"
+        timeout_ms: 5000
+        retry_count: 1
+        resource_servers:
+          - "https://api.example.com/travel-booking-api"
+        subject_properties:
+          - department
+        subject_property_mappings:
+          department: department_name
+notification:
+  otp:
+    length: 6
+    use_numeric_only: true
+    validity_period_seconds: 120
+`
+	userFile := suite.createTempFile(tempDir, "user*.yaml", userContent)
+
+	loadedConfig, err := LoadConfig(userFile, "", tempDir)
+
+	suite.Require().NoError(err)
+	suite.Require().True(loadedConfig.Authorization.ExternalAuthZEN.Enabled)
+	suite.Require().Len(loadedConfig.Authorization.ExternalAuthZEN.PDPs, 1)
+	suite.Equal("pdp-1", loadedConfig.Authorization.ExternalAuthZEN.PDPs[0].Name)
+	suite.Equal("http://localhost:9000/access/v1/evaluation",
+		loadedConfig.Authorization.ExternalAuthZEN.PDPs[0].Endpoint)
+	suite.Equal([]string{"https://api.example.com/travel-booking-api"},
+		loadedConfig.Authorization.ExternalAuthZEN.PDPs[0].ResourceServers)
+	suite.Equal([]string{"department"},
+		loadedConfig.Authorization.ExternalAuthZEN.PDPs[0].SubjectProperties)
+	suite.Equal(map[string]string{"department": "department_name"},
+		loadedConfig.Authorization.ExternalAuthZEN.PDPs[0].SubjectPropertyMappings)
+}
+
 func (suite *ConfigTestSuite) TestLoadConfigWithDefaults_NoDefaults() {
 	// Create a partial YAML user configuration file.
 	userContent := `

@@ -1,0 +1,55 @@
+apiVersion: api.cerbos.dev/v1
+
+resourcePolicy:
+  version: default
+  resource: "https://api.example.com/travel-booking"
+  rules:
+    - name: allow-cerbos-travel-agent-read
+      actions:
+        - "booking:read"
+      effect: EFFECT_ALLOW
+      roles:
+        - "*"
+      condition:
+        match:
+          expr: P.attr.groups.exists(group, group == "cerbos-travel-agent")
+
+    - name: allow-cerbos-travel-agent-create
+      actions:
+        - "booking:create"
+      effect: EFFECT_ALLOW
+      roles:
+        - "*"
+      condition:
+        match:
+          expr: P.attr.groups.exists(group, group == "cerbos-travel-agent")
+
+    - name: allow-upstream-booking-client-create
+      actions:
+        - "booking:create"
+      effect: EFFECT_ALLOW
+      roles:
+        - "*"
+      condition:
+        match:
+          expr: P.id == "authzen-booking-client"
+
+    - name: allow-upstream-booking-client-read
+      actions:
+        - "booking:read"
+      effect: EFFECT_ALLOW
+      roles:
+        - "*"
+      condition:
+        match:
+          expr: P.id == "authzen-booking-client"
+
+    - name: allow-downstream-exchange-client-create
+      actions:
+        - "booking:create"
+      effect: EFFECT_ALLOW
+      roles:
+        - "*"
+      condition:
+        match:
+          expr: P.id == "authzen-booking-exchange-client"
