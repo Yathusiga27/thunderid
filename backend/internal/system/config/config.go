@@ -571,6 +571,31 @@ type LogTimeRotationConfig struct {
 	IntervalDays *int  `yaml:"interval_days" json:"interval_days"`
 }
 
+// AuthorizationConfig configures authorization evaluation providers.
+type AuthorizationConfig struct {
+	ExternalAuthZEN ExternalAuthZENConfig `yaml:"external_authzen" json:"external_authzen"`
+}
+
+// ExternalAuthZENConfig configures an external AuthZEN policy decision point.
+type ExternalAuthZENConfig struct {
+	Enabled bool                       `yaml:"enabled" json:"enabled"`
+	PDPs    []ExternalAuthZENPDPConfig `yaml:"pdps"    json:"pdps"`
+}
+
+// ExternalAuthZENPDPConfig configures one external AuthZEN policy decision point.
+type ExternalAuthZENPDPConfig struct {
+	Name                    string            `yaml:"name"                json:"name"`
+	Endpoint                string            `yaml:"endpoint"            json:"endpoint"`
+	BearerToken             string            `yaml:"bearer_token"        json:"bearer_token"`
+	TimeoutMS               int               `yaml:"timeout_ms"           json:"timeout_ms"`
+	RetryCount              int               `yaml:"retry_count"          json:"retry_count"`
+	ResourceServers         []string          `yaml:"resource_servers"     json:"resource_servers"`
+	SubjectProperties       []string          `yaml:"subject_properties"        json:"subject_properties"`
+	SubjectPropertyMappings map[string]string `yaml:"subject_property_mappings" json:"subject_property_mappings"`
+	ResourceType            string            `yaml:"resource_type"             json:"resource_type"`
+	ResourceID              string            `yaml:"resource_id"          json:"resource_id"`
+}
+
 // Config holds the complete configuration details of the server.
 type Config struct {
 	Server               engineconfig.ServerConfig         `yaml:"server"                json:"server"`
@@ -608,6 +633,7 @@ type Config struct {
 	Email                EmailConfig                       `yaml:"email"                 json:"email"`
 	Notification         NotificationConfig                `yaml:"notification"          json:"notification"`
 	AttributeCache       engineconfig.AttributeCacheConfig `yaml:"attribute_cache" json:"attribute_cache"`
+	Authorization        AuthorizationConfig               `yaml:"authorization"         json:"authorization"`
 }
 
 // LoadConfig loads the configurations from the specified YAML file and applies defaults.

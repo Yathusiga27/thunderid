@@ -200,18 +200,19 @@ func (s *ServiceTestSuite) TestEvaluateAccessProviderNotImplementedUsesEmptyGrou
 	s.True(resp.Decision)
 }
 
-func (s *ServiceTestSuite) TestEvaluateAccessSkipsSubjectValidationWhenTypeEmpty() {
+func (s *ServiceTestSuite) TestEvaluateAccessInfersSubjectTypeWhenTypeEmpty() {
 	req := AccessEvaluationRequest{
 		Subject:  Subject{ID: "user1"},
 		Resource: Resource{Type: "booking", ID: testBookingResourceID},
 		Action:   Action{Name: testBookingReadAction},
 	}
 
+	s.mockValidSubject()
 	s.mockResourceServerIdentifier("booking")
 	s.mockValidAction(testBookingReadAction)
 	s.entityProviderMock.On("GetTransitiveEntityGroups", "user1").Return([]providers.EntityGroup{}, nil)
 	s.authzMock.On("EvaluateAccess", mock.Anything, providers.AccessEvaluationRequest{
-		Subject:        providers.Subject{ID: "user1", GroupIDs: []string{}},
+		Subject:        providers.Subject{Type: "user", ID: "user1", GroupIDs: []string{}},
 		ResourceServer: providers.AccessEvaluationResourceServer{ID: testResourceServerID},
 		Permission:     providers.Permission{Name: testBookingReadAction},
 	}).Return(&providers.AccessEvaluationResponse{Decision: true}, nil)
@@ -221,7 +222,6 @@ func (s *ServiceTestSuite) TestEvaluateAccessSkipsSubjectValidationWhenTypeEmpty
 	s.Nil(svcErr)
 	s.NotNil(resp)
 	s.True(resp.Decision)
-	s.entityProviderMock.AssertNotCalled(s.T(), "GetEntity", mock.Anything)
 }
 
 func (s *ServiceTestSuite) TestEvaluateAccessGroupResolutionFailure() {
@@ -438,6 +438,45 @@ func (s *ServiceTestSuite) TestEvaluateAccessBatchPreservesOrder() {
 	s.Nil(resp.Evaluations[0].Context)
 	s.assertDecisionContext(resp.Evaluations[1].Context)
 	s.entityProviderMock.AssertNumberOfCalls(s.T(), "GetTransitiveEntityGroups", 1)
+}
+
+func (s *ServiceTestSuite) TestEvaluateAccessBatchInfersSubjectTypeOnce() {
+	req := AccessEvaluationsRequest{
+		Evaluations: []AccessEvaluationRequest{
+			{
+				Subject:  Subject{ID: testSubjectID},
+				Resource: Resource{Type: "booking", ID: testBookingResourceID},
+				Action:   Action{Name: testBookingReadAction},
+			},
+			{
+				Subject:  Subject{ID: testSubjectID},
+				Resource: Resource{Type: "booking", ID: testBookingResourceID},
+				Action:   Action{Name: "booking:create"},
+			},
+		},
+	}
+
+	s.mockValidSubject()
+	s.mockResourceServerIdentifier("booking")
+	s.mockValidAction(testBookingReadAction)
+	s.mockValidAction("booking:create")
+	s.entityProviderMock.On("GetTransitiveEntityGroups", testSubjectID).Return([]providers.EntityGroup{}, nil).Once()
+	s.authzMock.On("EvaluateAccessBatch", mock.Anything,
+		mock.MatchedBy(func(req providers.AccessEvaluationsRequest) bool {
+			return len(req.Evaluations) == 2 &&
+				req.Evaluations[0].Subject.Type == testSubjectType &&
+				req.Evaluations[1].Subject.Type == testSubjectType
+		})).Return(&providers.AccessEvaluationsResponse{
+		Evaluations: []providers.AccessEvaluationResponse{{Decision: true}, {Decision: true}},
+	}, nil)
+
+	resp, svcErr := s.service.EvaluateAccessBatch(context.Background(), req)
+
+	s.Nil(svcErr)
+	s.NotNil(resp)
+	s.True(resp.Evaluations[0].Decision)
+	s.True(resp.Evaluations[1].Decision)
+	s.entityProviderMock.AssertNumberOfCalls(s.T(), "GetEntity", 1)
 }
 
 func (s *ServiceTestSuite) TestEvaluateAccessBatchInvalidActionReturnsFalse() {
@@ -692,10 +731,11 @@ func (s *ServiceTestSuite) TestEvaluateAccessBatchMissingEvaluations() {
 
 func (s *ServiceTestSuite) TestSearchActionsReturnsAuthorizedActions() {
 	req := AccessActionSearchRequest{
-		Subject:  Subject{Type: "user", ID: "user1"},
+		Subject:  Subject{ID: "user1"},
 		Resource: Resource{Type: "booking", ID: testBookingResourceID},
 	}
 
+	s.mockValidSubject()
 	s.entityProviderMock.On("GetTransitiveEntityGroups", "user1").Return([]providers.EntityGroup{
 		{ID: "group1"},
 	}, nil)
@@ -735,6 +775,7 @@ func (s *ServiceTestSuite) TestSearchActionsReturnsAuthorizedActions() {
 		mock.MatchedBy(func(req providers.AccessEvaluationsRequest) bool {
 			return len(req.Evaluations) == 3 &&
 				req.Evaluations[0].Subject.ID == "user1" &&
+				req.Evaluations[0].Subject.Type == testSubjectType &&
 				req.Evaluations[0].Subject.GroupIDs[0] == "group1" &&
 				req.Evaluations[0].ResourceServer.ID == testResourceServerID &&
 				req.Evaluations[0].Permission.Name == "booking:booking:read" &&

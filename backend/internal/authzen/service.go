@@ -61,9 +61,11 @@ func (s *authzenService) EvaluateAccess(ctx context.Context, request AccessEvalu
 		return nil, svcErr
 	}
 
-	if svcErr := s.validateSubject(ctx, request.Subject); svcErr != nil {
+	resolvedSubject, svcErr := s.resolveSubject(ctx, request.Subject)
+	if svcErr != nil {
 		return nil, svcErr
 	}
+	request.Subject = resolvedSubject
 
 	resourceServerID, svcErr := s.resolveResourceServerID(ctx, request.Resource.Type)
 	if svcErr != nil {
@@ -118,7 +120,7 @@ func (s *authzenService) EvaluateAccessBatch(ctx context.Context, request Access
 	authzEvaluationIndexes := make([]int, 0, len(request.Evaluations))
 	groupIDsBySubject := make(map[string][]string)
 	resourceServerIDsByIdentifier := make(map[string]string)
-	validSubjects := make(map[string]struct{})
+	resolvedSubjects := make(map[string]Subject)
 	validActions := make(map[string]struct{})
 	for i, evaluation := range request.Evaluations {
 		if svcErr := validateEvaluationRequest(evaluation); svcErr != nil {
@@ -147,8 +149,11 @@ func (s *authzenService) EvaluateAccessBatch(ctx context.Context, request Access
 		}
 
 		subjectKey := evaluation.Subject.Type + ":" + evaluation.Subject.ID
-		if _, ok := validSubjects[subjectKey]; !ok {
-			if svcErr := s.validateSubject(ctx, evaluation.Subject); svcErr != nil {
+		resolvedSubject, ok := resolvedSubjects[subjectKey]
+		if !ok {
+			var svcErr *tidcommon.ServiceError
+			resolvedSubject, svcErr = s.resolveSubject(ctx, evaluation.Subject)
+			if svcErr != nil {
 				if svcErr.Code == ErrorInvalidSubject.Code {
 					responses[i] = AccessEvaluationResponse{
 						Decision: false,
@@ -158,8 +163,9 @@ func (s *authzenService) EvaluateAccessBatch(ctx context.Context, request Access
 				}
 				return nil, svcErr
 			}
-			validSubjects[subjectKey] = struct{}{}
+			resolvedSubjects[subjectKey] = resolvedSubject
 		}
+		evaluation.Subject = resolvedSubject
 
 		actionKey := resourceServerID + ":" + evaluation.Action.Name
 		if _, ok := validActions[actionKey]; !ok {
@@ -232,6 +238,13 @@ func (s *authzenService) SearchActions(ctx context.Context, request AccessAction
 	}
 	if strings.TrimSpace(request.Resource.Type) == "" {
 		return nil, &ErrorMissingResource
+	}
+	if strings.TrimSpace(request.Subject.Type) == "" {
+		resolvedSubject, svcErr := s.resolveSubject(ctx, request.Subject)
+		if svcErr != nil {
+			return nil, svcErr
+		}
+		request.Subject = resolvedSubject
 	}
 
 	resourceServerID, svcErr := s.resolveResourceServerID(ctx, request.Resource.Type)
@@ -423,33 +436,37 @@ func appendUniquePermissionActions(
 	return actions
 }
 
-// validateSubject verifies that the subject exists and matches its type.
-func (s *authzenService) validateSubject(ctx context.Context, subject Subject) *tidcommon.ServiceError {
+// resolveSubject verifies the subject and infers an omitted type from its entity category.
+func (s *authzenService) resolveSubject(ctx context.Context, subject Subject) (Subject, *tidcommon.ServiceError) {
 	if s.entityProvider == nil {
-		return nil
-	}
-	if strings.TrimSpace(subject.Type) == "" {
-		return nil
+		return subject, nil
 	}
 
 	entity, err := s.entityProvider.GetEntity(subject.ID)
 	if err != nil {
 		if err.Code == entityprovider.ErrorCodeNotImplemented {
-			return nil
+			return subject, nil
 		}
 		if err.Code == entityprovider.ErrorCodeEntityNotFound {
-			return &ErrorInvalidSubject
+			return Subject{}, &ErrorInvalidSubject
 		}
 		s.logger.Error(ctx, "Failed to validate subject",
 			log.MaskedString(log.LoggerKeyUserID, subject.ID),
 			log.String("error", err.Error()))
-		return &tidcommon.InternalServerError
+		return Subject{}, &tidcommon.InternalServerError
 	}
 
-	if entity == nil || entity.Category.String() != subject.Type {
-		return &ErrorInvalidSubject
+	if entity == nil {
+		return Subject{}, &ErrorInvalidSubject
 	}
-	return nil
+	if strings.TrimSpace(subject.Type) == "" {
+		subject.Type = entity.Category.String()
+		return subject, nil
+	}
+	if entity.Category.String() != subject.Type {
+		return Subject{}, &ErrorInvalidSubject
+	}
+	return subject, nil
 }
 
 // validateAction verifies that an action is registered on the resource server.

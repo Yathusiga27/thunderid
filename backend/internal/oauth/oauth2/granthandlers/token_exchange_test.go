@@ -28,6 +28,8 @@ import (
 	"github.com/thunder-id/thunderid/internal/oauth/oauth2/revocation"
 	"github.com/thunder-id/thunderid/internal/oauth/oauth2/tokenservice"
 	"github.com/thunder-id/thunderid/internal/system/config"
+	"github.com/thunder-id/thunderid/tests/mocks/actorprovidermock"
+	"github.com/thunder-id/thunderid/tests/mocks/authzmock"
 	"github.com/thunder-id/thunderid/tests/mocks/jose/jwtmock"
 	"github.com/thunder-id/thunderid/tests/mocks/oauth/oauth2/tokenservicemock"
 	"github.com/thunder-id/thunderid/tests/mocks/resourcemock"
@@ -53,6 +55,8 @@ type TokenExchangeGrantHandlerTestSuite struct {
 	mockJWTService      *jwtmock.JWTServiceInterfaceMock
 	mockTokenBuilder    *tokenservicemock.TokenBuilderInterfaceMock
 	mockTokenValidator  *tokenservicemock.TokenValidatorInterfaceMock
+	mockAuthzService    *authzmock.AuthorizationProviderMock
+	mockActorProvider   *actorprovidermock.ActorProviderMock
 	mockResourceService *resourcemock.ResourceServiceInterfaceMock
 	handler             *tokenExchangeGrantHandler
 	oauthApp            *providers.OAuthClient
@@ -76,6 +80,8 @@ func (suite *TokenExchangeGrantHandlerTestSuite) SetupTest() {
 	suite.mockJWTService = jwtmock.NewJWTServiceInterfaceMock(suite.T())
 	suite.mockTokenBuilder = tokenservicemock.NewTokenBuilderInterfaceMock(suite.T())
 	suite.mockTokenValidator = tokenservicemock.NewTokenValidatorInterfaceMock(suite.T())
+	suite.mockAuthzService = authzmock.NewAuthorizationProviderMock(suite.T())
+	suite.mockActorProvider = actorprovidermock.NewActorProviderMock(suite.T())
 	suite.mockResourceService = resourcemock.NewResourceServiceInterfaceMock(suite.T())
 	// Explicit resource parameter resolves to an RS whose identifier equals the resource URI; an
 	// empty identifier resolves to the configured default resource server, as the default-aware
@@ -94,9 +100,24 @@ func (suite *TokenExchangeGrantHandlerTestSuite) SetupTest() {
 		}).Maybe()
 	suite.mockResourceService.On("ValidatePermissions", mock.Anything, mock.Anything, mock.Anything).
 		Return([]string{}, nil).Maybe()
+	suite.mockActorProvider.On("GetActorGroups", mock.Anything).
+		Return([]providers.EntityGroup{}, nil).Maybe()
+	suite.mockAuthzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return(
+			func(_ context.Context, request providers.AccessEvaluationsRequest) *providers.AccessEvaluationsResponse {
+				evaluations := make([]providers.AccessEvaluationResponse, 0, len(request.Evaluations))
+				for range request.Evaluations {
+					evaluations = append(evaluations, providers.AccessEvaluationResponse{Decision: true})
+				}
+				return &providers.AccessEvaluationsResponse{Evaluations: evaluations}
+			},
+			nil,
+		).Maybe()
 	suite.handler = &tokenExchangeGrantHandler{
 		tokenBuilder:    suite.mockTokenBuilder,
 		tokenValidator:  suite.mockTokenValidator,
+		authzService:    suite.mockAuthzService,
+		actorProvider:   suite.mockActorProvider,
 		resourceService: suite.mockResourceService,
 	}
 
@@ -230,7 +251,7 @@ func (suite *TokenExchangeGrantHandlerTestSuite) setupSuccessfulJWTMockWithScope
 // TestNewTokenExchangeGrantHandler tests the constructor
 func (suite *TokenExchangeGrantHandlerTestSuite) TestNewTokenExchangeGrantHandler() {
 	handler := newTokenExchangeGrantHandler(suite.mockTokenBuilder, suite.mockTokenValidator,
-		suite.mockResourceService, oauthconfig.Config{})
+		suite.mockAuthzService, suite.mockActorProvider, suite.mockResourceService, oauthconfig.Config{})
 	assert.NotNil(suite.T(), handler)
 	assert.Implements(suite.T(), (*GrantHandlerInterface)(nil), handler)
 }
@@ -2470,6 +2491,8 @@ func (suite *TokenExchangeGrantHandlerTestSuite) TestHandleGrant_NoResource_NoDe
 	h := &tokenExchangeGrantHandler{
 		tokenBuilder:    suite.mockTokenBuilder,
 		tokenValidator:  suite.mockTokenValidator,
+		authzService:    suite.mockAuthzService,
+		actorProvider:   suite.mockActorProvider,
 		resourceService: rsvc,
 	}
 
@@ -2578,6 +2601,8 @@ func (suite *TokenExchangeGrantHandlerTestSuite) TestHandleGrant_RFC8707_Resourc
 	h := &tokenExchangeGrantHandler{
 		tokenBuilder:    suite.mockTokenBuilder,
 		tokenValidator:  suite.mockTokenValidator,
+		authzService:    suite.mockAuthzService,
+		actorProvider:   suite.mockActorProvider,
 		resourceService: rsvc,
 	}
 
@@ -2633,6 +2658,8 @@ func (suite *TokenExchangeGrantHandlerTestSuite) TestHandleGrant_RFC8707_ScopeNo
 	h := &tokenExchangeGrantHandler{
 		tokenBuilder:    suite.mockTokenBuilder,
 		tokenValidator:  suite.mockTokenValidator,
+		authzService:    suite.mockAuthzService,
+		actorProvider:   suite.mockActorProvider,
 		resourceService: rsvc,
 	}
 
@@ -2861,6 +2888,82 @@ func (suite *TokenExchangeGrantHandlerTestSuite) TestHandleGrant_RFC8707_Multipl
 	assert.NotNil(suite.T(), errResp)
 	assert.Equal(suite.T(), constants.ErrorInvalidTarget, errResp.Error)
 	suite.mockTokenBuilder.AssertNotCalled(suite.T(), "BuildAccessToken", mock.Anything, mock.Anything)
+}
+
+// filterScopesAuthorizedForApp error paths.
+
+func (suite *TokenExchangeGrantHandlerTestSuite) TestFilterScopesAuthorizedForApp_NilAuthzService_ReturnsServerError() {
+	handler := &tokenExchangeGrantHandler{}
+
+	scopes, errResp := handler.filterScopesAuthorizedForApp(
+		context.Background(), suite.oauthApp, "rs-1", "https://api.example.com", []string{"read"})
+
+	assert.Nil(suite.T(), scopes)
+	assert.NotNil(suite.T(), errResp)
+	assert.Equal(suite.T(), constants.ErrorServerError, errResp.Error)
+}
+
+func (suite *TokenExchangeGrantHandlerTestSuite) TestFilterScopesAuthorizedForApp_ActorGroupsError() {
+	actorProvider := actorprovidermock.NewActorProviderMock(suite.T())
+	actorProvider.On("GetActorGroups", mock.Anything).
+		Return([]providers.EntityGroup(nil), &tidcommon.ServiceError{
+			Code:  "AZ-0001",
+			Error: tidcommon.I18nMessage{DefaultValue: "group lookup failed"},
+		})
+	handler := &tokenExchangeGrantHandler{
+		authzService:  suite.mockAuthzService,
+		actorProvider: actorProvider,
+	}
+
+	scopes, errResp := handler.filterScopesAuthorizedForApp(
+		context.Background(), suite.oauthApp, "rs-1", "https://api.example.com", []string{"read"})
+
+	assert.Nil(suite.T(), scopes)
+	assert.NotNil(suite.T(), errResp)
+	assert.Equal(suite.T(), constants.ErrorServerError, errResp.Error)
+}
+
+func (suite *TokenExchangeGrantHandlerTestSuite) TestFilterScopesAuthorizedForApp_EvaluateError_ReturnsServerError() {
+	authzService := authzmock.NewAuthorizationProviderMock(suite.T())
+	authzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return((*providers.AccessEvaluationsResponse)(nil), &tidcommon.ServiceError{
+			Code:  "AZ-0002",
+			Error: tidcommon.I18nMessage{DefaultValue: "evaluation failed"},
+		})
+	// actorProvider is nil, so app group resolution is skipped and evaluation runs directly.
+	handler := &tokenExchangeGrantHandler{authzService: authzService}
+
+	scopes, errResp := handler.filterScopesAuthorizedForApp(
+		context.Background(), suite.oauthApp, "rs-1", "https://api.example.com", []string{"read"})
+
+	assert.Nil(suite.T(), scopes)
+	assert.NotNil(suite.T(), errResp)
+	assert.Equal(suite.T(), constants.ErrorServerError, errResp.Error)
+}
+
+func (suite *TokenExchangeGrantHandlerTestSuite) TestFilterScopesAuthorizedForApp_WithAppGroups() {
+	actorProvider := actorprovidermock.NewActorProviderMock(suite.T())
+	actorProvider.On("GetActorGroups", mock.Anything).
+		Return([]providers.EntityGroup{{ID: "group-1"}}, nil)
+	authzService := authzmock.NewAuthorizationProviderMock(suite.T())
+	authzService.On("EvaluateAccessBatch", mock.Anything, mock.Anything).
+		Return(
+			func(_ context.Context, request providers.AccessEvaluationsRequest) *providers.AccessEvaluationsResponse {
+				evaluations := make([]providers.AccessEvaluationResponse, 0, len(request.Evaluations))
+				for range request.Evaluations {
+					evaluations = append(evaluations, providers.AccessEvaluationResponse{Decision: true})
+				}
+				return &providers.AccessEvaluationsResponse{Evaluations: evaluations}
+			},
+			nil,
+		)
+	handler := &tokenExchangeGrantHandler{authzService: authzService, actorProvider: actorProvider}
+
+	scopes, errResp := handler.filterScopesAuthorizedForApp(
+		context.Background(), suite.oauthApp, "rs-1", "https://api.example.com", []string{"read"})
+
+	assert.Nil(suite.T(), errResp)
+	assert.Equal(suite.T(), []string{"read"}, scopes)
 }
 
 func (suite *TokenExchangeGrantHandlerTestSuite) TestHandleGrant_DownscopeValidationError() {

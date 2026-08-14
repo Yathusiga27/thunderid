@@ -32,6 +32,7 @@ import (
 	authnprovidermgr "github.com/thunder-id/thunderid/internal/authnprovider/manager"
 	"github.com/thunder-id/thunderid/internal/authnprovider/restprovider"
 	"github.com/thunder-id/thunderid/internal/authz"
+	"github.com/thunder-id/thunderid/internal/authz/engine"
 	"github.com/thunder-id/thunderid/internal/authzen"
 	"github.com/thunder-id/thunderid/internal/cert"
 	"github.com/thunder-id/thunderid/internal/connection"
@@ -214,7 +215,39 @@ func registerServices(mux *http.ServeMux, cacheManager cache.CacheManagerInterfa
 	ouAuthzService.SetPermissionResolver(
 		role.NewEffectivePermissionResolver(roleService, groupService, entityService))
 
-	authZService := authz.Initialize(roleService)
+	rbacEngine := engine.NewRBACEngine(roleService)
+	authorizationEngine := engine.AuthorizationEngine(rbacEngine)
+	externalAuthZENConfig := runtime.Config.Authorization.ExternalAuthZEN
+	fatalOnError(ctx, logger, validateExternalAuthZENConfig(externalAuthZENConfig),
+		"Failed to initialize external AuthZEN PDP")
+	if externalAuthZENConfig.Enabled {
+		pdpConfigs := externalAuthZENConfig.PDPs
+
+		routes := make([]engine.AuthorizationPDPRoute, 0, len(pdpConfigs))
+		for _, pdpConfig := range pdpConfigs {
+			timeout := time.Duration(pdpConfig.TimeoutMS) * time.Millisecond
+			if timeout <= 0 {
+				timeout = 5 * time.Second
+			}
+			externalEngine, engineErr := engine.NewAuthZENPDP(engine.AuthZENPDPConfig{
+				Endpoint:                pdpConfig.Endpoint,
+				BearerToken:             pdpConfig.BearerToken,
+				Timeout:                 timeout,
+				RetryCount:              pdpConfig.RetryCount,
+				SubjectProperties:       pdpConfig.SubjectProperties,
+				SubjectPropertyMappings: pdpConfig.SubjectPropertyMappings,
+				ResourceType:            pdpConfig.ResourceType,
+				ResourceID:              pdpConfig.ResourceID,
+			})
+			fatalOnError(ctx, logger, engineErr, "Failed to initialize external AuthZEN PDP")
+			routes = append(routes, engine.AuthorizationPDPRoute{
+				Engine:          externalEngine,
+				ResourceServers: pdpConfig.ResourceServers,
+			})
+		}
+		authorizationEngine = engine.NewAuthorizationMultiRouter(rbacEngine, routes)
+	}
+	authZService := authz.Initialize(authorizationEngine, userService)
 
 	idpService, err := idp.Initialize(cacheManager, entityTypeService)
 	fatalOnError(ctx, logger, err, "Failed to initialize IDPService")
@@ -593,6 +626,13 @@ func initConsentService(ctx context.Context, logger *log.Logger,
 	consentService, err := consent.Initialize(inboundClientService)
 	fatalOnError(ctx, logger, err, "Failed to initialize consent service")
 	return consentService
+}
+
+func validateExternalAuthZENConfig(config config.ExternalAuthZENConfig) error {
+	if config.Enabled && len(config.PDPs) == 0 {
+		return fmt.Errorf("no external AuthZEN PDPs are configured")
+	}
+	return nil
 }
 
 // fatalOnError logs msg and exits the process if err is non-nil.

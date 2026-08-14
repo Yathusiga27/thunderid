@@ -1,0 +1,208 @@
+resource_type: user_type
+id: travel-customer-type
+category: user
+name: TravelCustomer
+ouHandle: default
+allowSelfRegistration: false
+systemAttributes:
+  display: username
+schema: {
+    "username": {"type": "string", "displayName": "Username", "required": true, "unique": true},
+    "password": {"type": "string", "displayName": "Password", "required": false, "credential": true},
+    "email": {"type": "string", "displayName": "Email", "required": true, "unique": true},
+    "ouId": {"type": "string", "displayName": "Organization Unit", "required": true},
+    "accountStatus": {"type": "string", "displayName": "Account Status", "required": true}
+  }
+
+---
+resource_type: user_type
+id: travel-staff-type
+category: user
+name: TravelStaff
+ouHandle: default
+allowSelfRegistration: false
+systemAttributes:
+  display: username
+schema: {
+    "username": {"type": "string", "displayName": "Username", "required": true, "unique": true},
+    "password": {"type": "string", "displayName": "Password", "required": false, "credential": true},
+    "email": {"type": "string", "displayName": "Email", "required": true, "unique": true},
+    "ouId": {"type": "string", "displayName": "Organization Unit", "required": true},
+    "accountStatus": {"type": "string", "displayName": "Account Status", "required": true}
+  }
+
+---
+resource_type: resource_server
+id: travel-booking-rs
+name: Travel Booking API
+description: Resource server used by the AuthZEN PDP, PEP, and embedded Cedar demos.
+identifier: https://api.example.com/travel-booking
+ouHandle: default
+delimiter: ":"
+resources:
+  - name: Booking
+    handle: booking
+    description: Travel booking permissions.
+    actions:
+      - name: Read
+        handle: read
+      - name: Create
+        handle: create
+      - name: Cancel
+        handle: cancel
+      - name: Upgrade
+        handle: upgrade
+
+---
+resource_type: user
+id: travel-alice-customer
+type: TravelCustomer
+ouHandle: default
+attributes:
+  username: alice.travel
+  email: alice@example.com
+  ouId: default
+  accountStatus: active
+credentials:
+  password: "{{.TRAVEL_ALICE_PASSWORD}}"
+
+---
+resource_type: user
+id: travel-bob-manager
+type: TravelStaff
+ouHandle: default
+attributes:
+  username: bob.manager
+  email: bob@example.com
+  ouId: default
+  accountStatus: active
+credentials:
+  password: "{{.TRAVEL_BOB_PASSWORD}}"
+
+---
+resource_type: user
+id: travel-tina-agent
+type: TravelStaff
+ouHandle: default
+attributes:
+  username: tina.agent
+  email: tina@example.com
+  ouId: default
+  accountStatus: active
+credentials:
+  password: "{{.TRAVEL_TINA_PASSWORD}}"
+
+---
+resource_type: application
+id: authzen-booking-client
+name: Travel Booking Upstream Service
+description: Upstream service that obtains a broad client-credentials token.
+type: fullstack
+ouHandle: default
+inboundAuthConfig:
+  - type: oauth2
+    config:
+      clientId: authzen-booking-client
+      clientSecret: "{{.AUTHZEN_TEST_CLIENT_SECRET}}"
+      grantTypes:
+        - client_credentials
+      tokenEndpointAuthMethod: client_secret_basic
+      publicClient: false
+
+---
+resource_type: application
+id: authzen-booking-exchange-client
+name: Travel Booking Downstream Service
+description: Downstream service that exchanges the upstream token for narrower access.
+type: fullstack
+ouHandle: default
+inboundAuthConfig:
+  - type: oauth2
+    config:
+      clientId: authzen-booking-exchange-client
+      clientSecret: "{{.AUTHZEN_EXCHANGE_CLIENT_SECRET}}"
+      grantTypes:
+        - urn:ietf:params:oauth:grant-type:token-exchange
+      tokenEndpointAuthMethod: client_secret_basic
+      publicClient: false
+
+---
+resource_type: application
+id: authzen-booking-browser
+name: Travel Booking Browser
+description: Public browser client for Alice's authorization-code and PKCE login demo.
+type: browser
+url: https://oauth.pstmn.io
+ouHandle: default
+authFlowHandle: default-flow
+isRegistrationFlowEnabled: false
+allowedUserTypes:
+  - TravelCustomer
+inboundAuthConfig:
+  - type: oauth2
+    config:
+      clientId: authzen-booking-browser
+      redirectUris:
+        - https://oauth.pstmn.io/v1/browser-callback
+      grantTypes:
+        - authorization_code
+        - refresh_token
+      responseTypes:
+        - code
+      tokenEndpointAuthMethod: none
+      pkceRequired: true
+      publicClient: true
+
+---
+resource_type: group
+id: cerbos-travel-agent
+name: Cerbos Travel Agent
+description: Group included in AuthZEN requests sent to Cerbos.
+ouHandle: default
+members:
+  - id: travel-alice-customer
+    type: user
+
+---
+resource_type: role
+id: travel-customer
+name: Travel Customer
+description: Allows Alice to request booking creation during the PEP login demo.
+ouHandle: default
+permissions:
+  - resourceServerId: travel-booking-rs
+    permissions:
+      - booking:create
+assignments:
+  - id: travel-alice-customer
+    type: user
+
+---
+resource_type: role
+id: travel-agent
+name: Travel Agent
+description: Allows Tina to read and upgrade assigned bookings.
+ouHandle: default
+permissions:
+  - resourceServerId: travel-booking-rs
+    permissions:
+      - booking:read
+      - booking:upgrade
+assignments:
+  - id: travel-tina-agent
+    type: user
+
+---
+resource_type: role
+id: booking-manager
+name: Booking Manager
+description: Allows Bob to manage confirmed bookings in his organization unit.
+ouHandle: default
+permissions:
+  - resourceServerId: travel-booking-rs
+    permissions:
+      - booking:read
+      - booking:cancel
+assignments:
+  - id: travel-bob-manager
+    type: user

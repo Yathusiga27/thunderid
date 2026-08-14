@@ -26,6 +26,8 @@ import (
 type tokenExchangeGrantHandler struct {
 	tokenBuilder    tokenservice.TokenBuilderInterface
 	tokenValidator  tokenservice.TokenValidatorInterface
+	authzService    providers.AuthorizationProvider
+	actorProvider   providers.ActorProvider
 	resourceService providers.ResourceServerProvider
 	cfg             oauthconfig.Config
 }
@@ -34,12 +36,16 @@ type tokenExchangeGrantHandler struct {
 func newTokenExchangeGrantHandler(
 	tokenBuilder tokenservice.TokenBuilderInterface,
 	tokenValidator tokenservice.TokenValidatorInterface,
+	authzService providers.AuthorizationProvider,
+	actorProvider providers.ActorProvider,
 	resourceService providers.ResourceServerProvider,
 	cfg oauthconfig.Config,
 ) GrantHandlerInterface {
 	return &tokenExchangeGrantHandler{
 		tokenBuilder:    tokenBuilder,
 		tokenValidator:  tokenValidator,
+		authzService:    authzService,
+		actorProvider:   actorProvider,
 		resourceService: resourceService,
 		cfg:             cfg,
 	}
@@ -273,6 +279,11 @@ func (h *tokenExchangeGrantHandler) HandleGrant(ctx context.Context, tokenReques
 		if resErr != nil {
 			return nil, resErr
 		}
+		permissionScopes, errResp = h.filterScopesAuthorizedForApp(ctx, oauthApp, targetRS.ID,
+			targetRS.Identifier, permissionScopes)
+		if errResp != nil {
+			return nil, errResp
+		}
 
 		finalScopes = make([]string, 0, len(oidcScopes)+len(permissionScopes))
 		finalScopes = append(finalScopes, oidcScopes...)
@@ -495,4 +506,57 @@ func (h *tokenExchangeGrantHandler) getScopes(
 	}
 
 	return validRequestedScopes, nil
+}
+
+func (h *tokenExchangeGrantHandler) filterScopesAuthorizedForApp(
+	ctx context.Context,
+	oauthApp *providers.OAuthClient,
+	resourceServerID string,
+	resourceServerIdentifier string,
+	scopes []string,
+) ([]string, *model.ErrorResponse) {
+	if len(scopes) == 0 {
+		return scopes, nil
+	}
+
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "TokenExchangeGrantHandler"))
+
+	if h.authzService == nil {
+		logger.Error(ctx, "Authorization provider is not configured for token exchange")
+		return nil, &model.ErrorResponse{
+			Error:            constants.ErrorServerError,
+			ErrorDescription: "Failed to generate token",
+		}
+	}
+
+	var groupIDs []string
+	if h.actorProvider != nil {
+		groups, groupErr := h.actorProvider.GetActorGroups(oauthApp.ID)
+		if groupErr != nil {
+			logger.Error(ctx, "Failed to resolve app group memberships",
+				log.String("appID", oauthApp.ID), log.String("error", groupErr.Error.DefaultValue))
+			return nil, &model.ErrorResponse{
+				Error:            constants.ErrorServerError,
+				ErrorDescription: "Failed to generate token",
+			}
+		}
+		for _, group := range groups {
+			if group.ID != "" && !slices.Contains(groupIDs, group.ID) {
+				groupIDs = append(groupIDs, group.ID)
+			}
+		}
+	}
+
+	authzResp, svcErr := h.authzService.EvaluateAccessBatch(ctx,
+		buildAccessEvaluationsRequest(oauthApp.ID, groupIDs, scopes, resourceServerID, resourceServerIdentifier))
+	if svcErr != nil {
+		logger.Error(ctx, "Failed to get authorized permissions for app",
+			log.String("appID", oauthApp.ID), log.String("error", svcErr.Error.DefaultValue))
+		return nil, &model.ErrorResponse{
+			Error:            constants.ErrorServerError,
+			ErrorDescription: "Failed to generate token",
+		}
+	}
+
+	return filterAuthorizedScopes(scopes, authzResp.Evaluations), nil
 }
