@@ -46,7 +46,7 @@ export interface ConnectionFieldDef {
   section?: string;
   /** Renders only when the named switch field's value is truthy. */
   revealedBy?: string;
-  /** Becomes required when the named switch field's value is truthy. */
+  /** Becomes required when the named switch field is truthy. */
   requiredWhen?: string;
   /** Which form mode renders this field (default 'both'). Optional fields are edit-only to keep create simple. */
   visibility?: ConnectionFieldVisibility;
@@ -366,6 +366,34 @@ export const CONNECTION_FORM_FIELDS: Record<ConnectionType, ConnectionFieldDef[]
       kind: 'key-value',
       placeholder: 'X-API-Key',
       addLabelKey: 'connections:form.fields.httpHeaders.add',
+    },
+  ],
+  [ConnectionTypes.EXTERNAL_AUTHZEN_PDP]: [
+    NAME_FIELD('Production AuthZEN PDP'),
+    {
+      name: 'endpoint',
+      labelKey: 'connections:form.fields.authzenEndpoint.label',
+      kind: 'url',
+      required: true,
+      placeholder: 'https://pdp.example.com/.well-known/authzen-configuration',
+    },
+    {
+      name: 'timeoutMs',
+      labelKey: 'connections:form.fields.timeoutMs.label',
+      hintKey: 'connections:form.fields.timeoutMs.hint',
+      kind: 'text',
+      visibility: 'edit',
+      defaultValue: '500',
+      placeholder: '500',
+    },
+    {
+      name: 'retryCount',
+      labelKey: 'connections:form.fields.retryCount.label',
+      hintKey: 'connections:form.fields.retryCount.hint',
+      kind: 'text',
+      visibility: 'edit',
+      defaultValue: '1',
+      placeholder: '1',
     },
   ],
 };

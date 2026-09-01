@@ -7,6 +7,8 @@ import type {ConnectionRequest, ConnectionResponse} from '../models/connection';
 /** The placeholder value the API returns for stored secrets. Must never be sent back. */
 export const MASKED_SECRET = '******';
 
+const NUMERIC_REQUEST_FIELDS = new Set(['timeoutMs', 'retryCount']);
+
 /** Flat string-keyed form state shared by all per-vendor forms. */
 export type ConnectionFormValues = Record<string, string>;
 
@@ -52,7 +54,13 @@ export function responseToFormValues(
       values[field.name] = raw === true ? 'true' : 'false';
       continue;
     }
-    values[field.name] = typeof raw === 'string' && raw !== '' ? raw : (field.defaultValue ?? '');
+    if (typeof raw === 'string' && raw !== '') {
+      values[field.name] = raw;
+    } else if (typeof raw === 'number' && Number.isFinite(raw)) {
+      values[field.name] = String(raw);
+    } else {
+      values[field.name] = field.defaultValue ?? '';
+    }
   }
   return values;
 }
@@ -107,7 +115,7 @@ export function formValuesToRequest(
 
     // Always include required fields and any non-empty value; omit empty optional fields.
     if (field.required || raw !== '') {
-      payload[field.name] = raw;
+      payload[field.name] = NUMERIC_REQUEST_FIELDS.has(field.name) ? Number(raw) : raw;
     }
   }
 

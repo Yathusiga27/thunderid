@@ -12,6 +12,17 @@ const refetchMock = vi.fn().mockResolvedValue({});
 const deleteMock = vi.fn((_id: string, opts: {onSuccess: () => void}) => opts.onSuccess());
 const navigateMock = vi.fn();
 const updateMutationState = {isPending: false, isError: false};
+const usagesQueryState: {
+  data?: {totalResults: number | null; count: number; summary: Record<string, number>; usages: unknown[]};
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+} = {
+  data: {totalResults: 0, count: 0, summary: {}, usages: []},
+  isLoading: false,
+  isError: false,
+  error: null,
+};
 
 const ATTR_CONFIG = {
   userTypeResolution: {default: 'employee'},
@@ -51,6 +62,17 @@ const OIDC_CONNECTION = {
   redirectUri: 'https://id.acme.io/oauth/callback/oidc',
 };
 
+const AUTHZEN_PDP_CONNECTION = {
+  id: 'pdp1',
+  type: 'external-authzen-pdp',
+  name: 'External AuthZEN PDP',
+  endpoint: 'https://pdp.example.com/.well-known/authzen-configuration',
+  timeoutMs: 500,
+  retryCount: 1,
+  subjectProperties: 'email department',
+  subjectPropertyMappings: 'department: dept',
+};
+
 const mockParams: {type: string; id: string} = {type: 'google', id: 'g1'};
 const mockConn: {data: Record<string, unknown>} = {data: CONNECTION};
 
@@ -85,7 +107,7 @@ vi.mock('../../api/useUpdateConnection', () => ({
 }));
 vi.mock('../../api/useDeleteConnection', () => ({default: () => ({mutate: deleteMock, isPending: false})}));
 vi.mock('../../api/useGetConnectionUsages', () => ({
-  default: () => ({data: {totalResults: 0, count: 0, summary: {}, usages: []}, isLoading: false}),
+  default: () => usagesQueryState,
 }));
 
 vi.mock('../../components/ConnectionForm', () => ({
@@ -119,6 +141,29 @@ vi.mock('../../components/AttributeMappingSection', () => ({
   },
 }));
 
+vi.mock('../../components/SubjectMappingSection', () => ({
+  default: function StubSubjectMappingSection({
+    values,
+    onChange,
+  }: {
+    values: {subjectProperties?: string; subjectPropertyMappings?: string};
+    onChange: (field: 'subjectProperties' | 'subjectPropertyMappings', value: string) => void;
+  }) {
+    return (
+      <div data-testid="stub-subject-mapping">
+        <span>{values.subjectProperties}</span>
+        <button
+          type="button"
+          data-testid="edit-subject-mapping"
+          onClick={() => onChange('subjectProperties', 'email riskScore')}
+        >
+          edit subject mapping
+        </button>
+      </div>
+    );
+  },
+}));
+
 describe('ConnectionDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,6 +172,10 @@ describe('ConnectionDetailPage', () => {
     mockConn.data = CONNECTION;
     updateMutationState.isPending = false;
     updateMutationState.isError = false;
+    usagesQueryState.data = {totalResults: 0, count: 0, summary: {}, usages: []};
+    usagesQueryState.isLoading = false;
+    usagesQueryState.isError = false;
+    usagesQueryState.error = null;
   });
 
   it('renders the general tab with quick-copy and the credentials form', () => {
@@ -217,6 +266,19 @@ describe('ConnectionDetailPage', () => {
     expect(navigateMock).toHaveBeenCalledWith('/connections');
   });
 
+  it('shows a connection usage check failure inside the delete dialog', () => {
+    usagesQueryState.data = undefined;
+    usagesQueryState.isError = true;
+    usagesQueryState.error = new Error('raw usage failure');
+
+    render(<ConnectionDetailPage />);
+    fireEvent.click(screen.getByTestId('connection-tab-advanced'));
+    fireEvent.click(screen.getByTestId('connection-delete-button'));
+
+    expect(screen.getByText('Failed to check connection usage. Please try again.')).toBeInTheDocument();
+    expect(screen.getByTestId('connection-delete-confirm')).toBeDisabled();
+  });
+
   it('SMS vendor: hides the attribute-mapping tab and save omits attributeConfiguration', () => {
     mockParams.type = 'twilio';
     mockParams.id = 'tw1';
@@ -237,5 +299,30 @@ describe('ConnectionDetailPage', () => {
       senderId: '+15005550006',
     });
     expect('attributeConfiguration' in payload).toBe(false);
+  });
+
+  it('External AuthZEN PDP: shows subject mapping in its own tab and saves it with the connection', () => {
+    mockParams.type = 'external-authzen-pdp';
+    mockParams.id = 'pdp1';
+    mockConn.data = AUTHZEN_PDP_CONNECTION;
+    render(<ConnectionDetailPage />);
+
+    expect(screen.getByTestId('connection-tab-subject-mapping')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('connection-tab-subject-mapping'));
+    expect(screen.getByTestId('stub-subject-mapping')).toHaveTextContent('email department');
+
+    fireEvent.click(screen.getByTestId('edit-subject-mapping'));
+    fireEvent.click(screen.getByTestId('save-bar'));
+
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    const payload = updateMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      name: 'External AuthZEN PDP',
+      endpoint: 'https://pdp.example.com/.well-known/authzen-configuration',
+      subjectProperties: 'email riskScore',
+      subjectPropertyMappings: 'department: dept',
+    });
+    expect('resourceType' in payload).toBe(false);
+    expect('resourceId' in payload).toBe(false);
   });
 });

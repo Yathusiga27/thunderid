@@ -14,6 +14,7 @@ export const ConnectionTypes = {
   TWILIO: 'twilio',
   VONAGE: 'vonage',
   SMS_GATEWAY: 'sms-gateway',
+  EXTERNAL_AUTHZEN_PDP: 'external-authzen-pdp',
 } as const;
 
 export type ConnectionType = (typeof ConnectionTypes)[keyof typeof ConnectionTypes];
@@ -31,6 +32,7 @@ export type ConnectionCategory =
   | 'identity-verification'
   | 'crm'
   | 'data-store'
+  | 'authorization'
   | 'trusted-idp'
   | 'custom';
 
@@ -40,6 +42,7 @@ export type ConnectionCategory =
 export const ConnectionInstanceCategories = {
   IDENTITY_PROVIDER: 'identity-provider',
   SMS_PROVIDER: 'sms-provider',
+  AUTHORIZATION_PDP: 'authorization-pdp',
 } as const;
 
 export type ConnectionInstanceCategory =
@@ -240,16 +243,38 @@ export interface SMSGatewayConnectionRequest {
   httpHeaders?: string;
 }
 
+export interface ExternalAuthZENPDPConnectionRequest {
+  name: string;
+  description?: string;
+  endpoint: string;
+  timeoutMs?: string;
+  retryCount?: string;
+  subjectProperties?: string;
+  subjectPropertyMappings?: string;
+  subjectAttributeMappings?: ExternalAuthZENPDPSubjectAttributeMapping[];
+}
+
+export interface ExternalAuthZENPDPSubjectAttributeMapping {
+  userType: string;
+  attributes: ExternalAuthZENPDPSubjectAttribute[];
+}
+
+export interface ExternalAuthZENPDPSubjectAttribute {
+  attribute: string;
+  pdpAttribute?: string;
+}
+
 export type ConnectionRequest =
   | OAuthConnectionRequest
   | OIDCConnectionRequest
   | OAuth2ConnectionRequest
   | TwilioConnectionRequest
   | VonageConnectionRequest
-  | SMSGatewayConnectionRequest;
+  | SMSGatewayConnectionRequest
+  | ExternalAuthZENPDPConnectionRequest;
 
 /**
- * Vendor response — secrets returned masked as "******". A superset carrying every vendor's
+ * Vendor response — secrets are never returned. A superset carrying every vendor's
  * fields (IdP + SMS); the shared form mapping reads only the fields relevant to each type.
  */
 export interface ConnectionResponse extends OIDCConnectionRequest {
@@ -268,6 +293,13 @@ export interface ConnectionResponse extends OIDCConnectionRequest {
   httpMethod?: string;
   contentType?: string;
   httpHeaders?: string;
+  /** External AuthZEN PDP fields. */
+  endpoint?: string;
+  timeoutMs?: number | string;
+  retryCount?: number | string;
+  subjectProperties?: string;
+  subjectPropertyMappings?: string;
+  subjectAttributeMappings?: ExternalAuthZENPDPSubjectAttributeMapping[];
 }
 
 /**

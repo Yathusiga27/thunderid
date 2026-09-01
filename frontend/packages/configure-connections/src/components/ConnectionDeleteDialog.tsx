@@ -1,6 +1,7 @@
 // Copyright 2025 The ThunderID Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import {getErrorMessage} from '@thunderid/utils';
 import {
   Alert,
   Button,
@@ -46,17 +47,22 @@ export default function ConnectionDeleteDialog({
 }: ConnectionDeleteDialogProps): JSX.Element {
   const {t} = useTranslation('connections');
 
-  const {data: usagesData, isLoading: isLoadingUsages} = useGetConnectionUsages(
-    connectionType,
-    connectionId || undefined,
-    open,
-  );
+  const usagesQuery = useGetConnectionUsages(connectionType, connectionId || undefined, open);
+  const {data: usagesData, isLoading: isLoadingUsages, isError: isUsagesError, error: usagesError} = usagesQuery;
 
   const usagesKnown = usagesData !== undefined && usagesData.totalResults !== null;
   const blockingUsages = usagesData?.usages.filter((usage) => usage.behaviorOnDelete === 'restrict') ?? [];
   const hasBlockingUsages = usagesKnown && blockingUsages.length > 0;
   const visibleBlocking = blockingUsages.slice(0, MAX_VISIBLE_USAGES);
   const hiddenBlockingCount = blockingUsages.length - visibleBlocking.length;
+  const usagesErrorMessage = isUsagesError
+    ? getErrorMessage(
+        usagesError,
+        t,
+        'delete.usages.error',
+        'Failed to check connection usage. Please try again.',
+      )
+    : null;
 
   return (
     <Dialog open={open} onClose={isPending ? undefined : onClose} maxWidth="sm" fullWidth>
@@ -68,6 +74,8 @@ export default function ConnectionDeleteDialog({
           <Alert severity="info" icon={<CircularProgress size={16} />}>
             {t('delete.usages.loading')}
           </Alert>
+        ) : isUsagesError ? (
+          <Alert severity="error">{usagesErrorMessage}</Alert>
         ) : hasBlockingUsages ? (
           <Alert severity="error">
             <Typography variant="body2" sx={{mb: 1}}>
@@ -108,7 +116,7 @@ export default function ConnectionDeleteDialog({
           onClick={onConfirm}
           color="error"
           variant="contained"
-          disabled={isPending || isLoadingUsages || hasBlockingUsages}
+          disabled={isPending || isLoadingUsages || isUsagesError || hasBlockingUsages}
           data-testid="connection-delete-confirm"
         >
           {t('common:actions.delete')}

@@ -16,25 +16,27 @@ const OIDC_FIELDS = CONNECTION_FORM_FIELDS.oidc;
 const OAUTH_FIELDS = CONNECTION_FORM_FIELDS.oauth;
 const TWILIO_FIELDS = CONNECTION_FORM_FIELDS.twilio;
 const SMS_GATEWAY_FIELDS = CONNECTION_FORM_FIELDS['sms-gateway'];
+const AUTHZEN_PDP_FIELDS = CONNECTION_FORM_FIELDS['external-authzen-pdp'];
 const REDIRECT = 'https://id.acme.io/oauth/callback/google';
 const VALID_ACCOUNT_SID = `AC${'a1b2c3d4e5f6'.repeat(2)}01234567`;
 
 describe('emptyFormValues', () => {
   it('blanks every field except the derived redirect URI', () => {
     const values = emptyFormValues(GOOGLE_FIELDS, REDIRECT);
-    expect(values.redirectUri).toBe(REDIRECT);
-    expect(values.name).toBe('');
-    expect(values.clientId).toBe('');
-    expect(values.clientSecret).toBe('');
+    expect(values['redirectUri']).toBe(REDIRECT);
+    expect(values['name']).toBe('');
+    expect(values['clientId']).toBe('');
+    expect(values['clientSecret']).toBe('');
   });
 
   it('prefills fields that declare a default value', () => {
     const values = emptyFormValues(SMS_GATEWAY_FIELDS, REDIRECT);
-    expect(values.httpMethod).toBe('POST');
-    expect(values.contentType).toBe('JSON');
-    expect(values.url).toBe('');
-    expect(values.httpHeaders).toBe('');
+    expect(values['httpMethod']).toBe('POST');
+    expect(values['contentType']).toBe('JSON');
+    expect(values['url']).toBe('');
+    expect(values['httpHeaders']).toBe('');
   });
+
 });
 
 describe('responseToFormValues', () => {
@@ -50,17 +52,17 @@ describe('responseToFormValues', () => {
     } as ConnectionResponse;
 
     const values = responseToFormValues(response, GOOGLE_FIELDS, REDIRECT);
-    expect(values.name).toBe('My Google');
-    expect(values.clientId).toBe('abc');
-    expect(values.clientSecret).toBe('');
-    expect(values.scopes).toBe('openid email profile');
-    expect(values.redirectUri).toBe('https://stored/callback');
+    expect(values['name']).toBe('My Google');
+    expect(values['clientId']).toBe('abc');
+    expect(values['clientSecret']).toBe('');
+    expect(values['scopes']).toBe('openid email profile');
+    expect(values['redirectUri']).toBe('https://stored/callback');
   });
 
   it('falls back to the derived redirect URI when the response has none', () => {
     const response = {id: '1', type: 'google', name: 'X', clientId: 'y'} as ConnectionResponse;
     const values = responseToFormValues(response, GOOGLE_FIELDS, REDIRECT);
-    expect(values.redirectUri).toBe(REDIRECT);
+    expect(values['redirectUri']).toBe(REDIRECT);
   });
 
   it('converts a boolean tokenExchangeEnabled into a "true"/"false" form string', () => {
@@ -71,7 +73,7 @@ describe('responseToFormValues', () => {
       clientId: 'y',
       tokenExchangeEnabled: true,
     } as ConnectionResponse;
-    expect(responseToFormValues(enabled, OIDC_FIELDS, REDIRECT).tokenExchangeEnabled).toBe('true');
+    expect(responseToFormValues(enabled, OIDC_FIELDS, REDIRECT)['tokenExchangeEnabled']).toBe('true');
 
     const disabled = {
       id: '1',
@@ -80,7 +82,22 @@ describe('responseToFormValues', () => {
       clientId: 'y',
       tokenExchangeEnabled: false,
     } as ConnectionResponse;
-    expect(responseToFormValues(disabled, OIDC_FIELDS, REDIRECT).tokenExchangeEnabled).toBe('false');
+    expect(responseToFormValues(disabled, OIDC_FIELDS, REDIRECT)['tokenExchangeEnabled']).toBe('false');
+  });
+
+  it('converts numeric AuthZEN PDP response fields into form strings', () => {
+    const response = {
+      id: '1',
+      type: 'external-authzen-pdp',
+      name: 'Cerbos PDP',
+      endpoint: 'http://localhost:3592/.well-known/authzen-configuration',
+      timeoutMs: 1000,
+      retryCount: 1,
+    } as ConnectionResponse;
+
+    const values = responseToFormValues(response, AUTHZEN_PDP_FIELDS, REDIRECT);
+    expect(values['timeoutMs']).toBe('1000');
+    expect(values['retryCount']).toBe('1');
   });
 });
 
@@ -91,8 +108,8 @@ describe('formValuesToRequest', () => {
     const payload = formValuesToRequest({...base, clientSecret: 's3cret'}, GOOGLE_FIELDS, {
       mode: 'create',
     }) as unknown as Record<string, unknown>;
-    expect(payload.clientSecret).toBe('s3cret');
-    expect(payload.scopes).toEqual(['openid', 'email']);
+    expect(payload['clientSecret']).toBe('s3cret');
+    expect(payload['scopes']).toEqual(['openid', 'email']);
   });
 
   it('includes trusted token audience when configured', () => {
@@ -101,12 +118,13 @@ describe('formValuesToRequest', () => {
         ...base,
         authorizationEndpoint: 'https://i/a',
         tokenEndpoint: 'https://i/t',
+        tokenExchangeEnabled: 'true',
         trustedTokenAudience: 'my-external-client-id',
       },
       OIDC_FIELDS,
       {mode: 'create'},
     ) as unknown as Record<string, unknown>;
-    expect(payload.trustedTokenAudience).toBe('my-external-client-id');
+    expect(payload['trustedTokenAudience']).toBe('my-external-client-id');
   });
 
   it('sends the SMS gateway transport fields and omits empty optional headers', () => {
@@ -122,6 +140,18 @@ describe('formValuesToRequest', () => {
       httpMethod: 'POST',
       contentType: 'JSON',
     });
+  });
+
+  it('sends AuthZEN PDP timing fields as numbers', () => {
+    const payload = formValuesToRequest(
+      {name: 'Cerbos PDP', endpoint: 'http://localhost:3592/.well-known/authzen-configuration', timeoutMs: '500', retryCount: '1'},
+      AUTHZEN_PDP_FIELDS,
+      {mode: 'edit'},
+    ) as unknown as Record<string, unknown>;
+
+    expect(payload).toMatchObject({timeoutMs: 500, retryCount: 1});
+    expect(typeof payload['timeoutMs']).toBe('number');
+    expect(typeof payload['retryCount']).toBe('number');
   });
 
   it('still sends the SMS gateway transport defaults now that neither field is required', () => {
@@ -153,7 +183,7 @@ describe('formValuesToRequest', () => {
       mode: 'edit',
       secretReplaced: true,
     }) as unknown as Record<string, unknown>;
-    expect(payload.clientSecret).toBe('new');
+    expect(payload['clientSecret']).toBe('new');
   });
 
   it('omits the secret on edit when replacing but left empty', () => {
@@ -183,8 +213,8 @@ describe('formValuesToRequest', () => {
       OIDC_FIELDS,
       {mode: 'create'},
     ) as unknown as Record<string, unknown>;
-    expect(payload.tokenExchangeEnabled).toBe(true);
-    expect(typeof payload.tokenExchangeEnabled).toBe('boolean');
+    expect(payload['tokenExchangeEnabled']).toBe(true);
+    expect(typeof payload['tokenExchangeEnabled']).toBe('boolean');
   });
 
   it('emits tokenExchangeEnabled as false when the switch is off', () => {
@@ -198,8 +228,9 @@ describe('formValuesToRequest', () => {
       OIDC_FIELDS,
       {mode: 'create'},
     ) as unknown as Record<string, unknown>;
-    expect(payload.tokenExchangeEnabled).toBe(false);
+    expect(payload['tokenExchangeEnabled']).toBe(false);
   });
+
 
   it('omits empty optional fields but keeps required ones', () => {
     const payload = formValuesToRequest(
@@ -219,7 +250,7 @@ describe('formValuesToRequest', () => {
       OIDC_FIELDS,
       {mode: 'create'},
     ) as unknown as Record<string, unknown>;
-    expect(payload.authorizationEndpoint).toBe('https://i/a');
+    expect(payload['authorizationEndpoint']).toBe('https://i/a');
     expect(payload).not.toHaveProperty('userInfoEndpoint');
     expect(payload).not.toHaveProperty('issuer');
     expect(payload).not.toHaveProperty('scopes');
@@ -229,9 +260,9 @@ describe('formValuesToRequest', () => {
 describe('validateConnectionForm', () => {
   it('flags required fields on create', () => {
     const errors = validateConnectionForm(emptyFormValues(GOOGLE_FIELDS, REDIRECT), GOOGLE_FIELDS, 'create');
-    expect(errors.name).toBe('connections:validation.required');
-    expect(errors.clientId).toBe('connections:validation.required');
-    expect(errors.clientSecret).toBe('connections:validation.required');
+    expect(errors['name']).toBe('connections:validation.required');
+    expect(errors['clientId']).toBe('connections:validation.required');
+    expect(errors['clientSecret']).toBe('connections:validation.required');
   });
 
   it('does not require the OAuth 2 user profile endpoint', () => {
@@ -270,7 +301,7 @@ describe('validateConnectionForm', () => {
       OIDC_FIELDS,
       'create',
     );
-    expect(bad.authorizationEndpoint).toBe('connections:validation.url');
+    expect(bad['authorizationEndpoint']).toBe('connections:validation.url');
 
     const good = validateConnectionForm(
       {
@@ -293,7 +324,7 @@ describe('validateConnectionForm', () => {
       TWILIO_FIELDS,
       'create',
     );
-    expect(errors.accountSid).toBe('connections:validation.accountSid');
+    expect(errors['accountSid']).toBe('connections:validation.accountSid');
   });
 
   it('accepts a well-formed Twilio account SID', () => {
@@ -311,7 +342,7 @@ describe('validateConnectionForm', () => {
       TWILIO_FIELDS,
       'create',
     );
-    expect(errors.accountSid).toBe('connections:validation.required');
+    expect(errors['accountSid']).toBe('connections:validation.required');
   });
 
   it('requires issuer and jwksEndpoint only when tokenExchangeEnabled is on', () => {
@@ -331,9 +362,10 @@ describe('validateConnectionForm', () => {
     expect(withExchangeOff).not.toHaveProperty('jwksEndpoint');
 
     const withExchangeOn = validateConnectionForm({...base, tokenExchangeEnabled: 'true'}, OIDC_FIELDS, 'create');
-    expect(withExchangeOn.issuer).toBe('connections:validation.required');
-    expect(withExchangeOn.jwksEndpoint).toBe('connections:validation.required');
+    expect(withExchangeOn['issuer']).toBe('connections:validation.required');
+    expect(withExchangeOn['jwksEndpoint']).toBe('connections:validation.required');
   });
+
 
   it('skips validation for a field hidden by revealedBy, even if it would otherwise be invalid', () => {
     const fields: ConnectionFieldDef[] = [
@@ -345,6 +377,19 @@ describe('validateConnectionForm', () => {
     expect(hidden).not.toHaveProperty('child');
 
     const shown = validateConnectionForm({gate: 'true', child: 'not-a-url'}, fields, 'create');
-    expect(shown.child).toBe('connections:validation.url');
+    expect(shown['child']).toBe('connections:validation.url');
+  });
+
+  it('skips validation for a field hidden by revealedWhen, even if it would otherwise be invalid', () => {
+    const fields: ConnectionFieldDef[] = [
+      {name: 'mode', labelKey: 'x', kind: 'select'},
+      {name: 'child', labelKey: 'y', kind: 'url', required: true, revealedWhen: {field: 'mode', value: 'SHOW'}},
+    ];
+
+    const hidden = validateConnectionForm({mode: 'HIDE', child: 'not-a-url'}, fields, 'create');
+    expect(hidden).not.toHaveProperty('child');
+
+    const shown = validateConnectionForm({mode: 'SHOW', child: 'not-a-url'}, fields, 'create');
+    expect(shown['child']).toBe('connections:validation.url');
   });
 });

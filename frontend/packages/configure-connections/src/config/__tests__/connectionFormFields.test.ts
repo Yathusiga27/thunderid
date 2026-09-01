@@ -107,4 +107,17 @@ describe('fieldsForMode', () => {
     expect(headers).toMatchObject({kind: 'key-value', addLabelKey: 'connections:form.fields.httpHeaders.add'});
     expect(headers?.required).toBeUndefined();
   });
+
+  it('keeps External AuthZEN PDP creation focused on endpoint and runtime settings', () => {
+    expect(fieldNames(ConnectionTypes.EXTERNAL_AUTHZEN_PDP, 'create')).toEqual([
+      'name',
+      'endpoint',
+    ]);
+    expect(fieldNames(ConnectionTypes.EXTERNAL_AUTHZEN_PDP, 'edit')).toEqual([
+      'name',
+      'endpoint',
+      'timeoutMs',
+      'retryCount',
+    ]);
+  });
 });

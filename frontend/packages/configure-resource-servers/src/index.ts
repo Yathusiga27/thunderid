@@ -9,6 +9,8 @@ export {default as useUpdateResourceServer} from './api/useUpdateResourceServer'
 export {default as useDeleteResourceServer} from './api/useDeleteResourceServer';
 export {default as useGetDefaultResourceServer} from './api/useGetDefaultResourceServer';
 export {default as useSetDefaultResourceServer} from './api/useSetDefaultResourceServer';
+export {default as useExternalAuthZENPDPConnections} from './api/useExternalAuthZENPDPConnections';
+export type {ExternalAuthZENPDPConnectionSummary} from './api/useExternalAuthZENPDPConnections';
 export {default as useGetResources} from './api/useGetResources';
 export {default as useCreateResource} from './api/useCreateResource';
 export {default as useUpdateResource} from './api/useUpdateResource';
@@ -36,6 +38,7 @@ export {default as ResourceServerQueryKeys} from './constants/resource-server-qu
 // Models
 export type {
   ResourceServer,
+  AuthorizationEngine,
   ResourceServerListResponse,
   Resource,
   ResourceListResponse,

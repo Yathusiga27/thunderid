@@ -26,6 +26,7 @@ export default function useGetConnectionUsages(
   return useQuery<ConnectionUsagesResponse>({
     queryKey: [ConnectionQueryKeys.CONNECTION_USAGES, type, id],
     enabled: Boolean(id) && enabled,
+    retry: false,
     queryFn: async (): Promise<ConnectionUsagesResponse> => {
       const serverUrl: string = getServerUrl();
       const response: {

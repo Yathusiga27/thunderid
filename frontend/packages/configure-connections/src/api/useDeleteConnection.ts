@@ -32,8 +32,7 @@ export default function useDeleteConnection(type: ConnectionType): UseMutationRe
         },
       } as unknown as Parameters<typeof http.request>[0]);
     },
-    onSuccess: (_data, id) => {
-      queryClient.removeQueries({queryKey: [ConnectionQueryKeys.CONNECTION, type, id]});
+    onSuccess: () => {
       queryClient.invalidateQueries({queryKey: [ConnectionQueryKeys.CONNECTIONS]}).catch(() => {
         // Ignore invalidation errors
       });

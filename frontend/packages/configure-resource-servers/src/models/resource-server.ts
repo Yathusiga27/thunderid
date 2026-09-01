@@ -4,6 +4,7 @@
 import type {PermissionDelimiter} from './permissions';
 
 export type ResourceServerType = 'API' | 'MCP' | 'CUSTOM';
+export type AuthorizationEngine = 'rbac' | 'external_authzen_pdp';
 
 const DEFAULT_ELIGIBLE_TYPES: readonly ResourceServerType[] = ['API', 'CUSTOM'];
 
@@ -21,6 +22,8 @@ export interface ResourceServer {
   delimiter: string;
   isReadOnly?: boolean;
   type: ResourceServerType;
+  authorizationEngine?: string;
+  externalPDPConnectionId?: string;
 }
 
 export interface ResourceServerListResponse {
@@ -81,6 +84,8 @@ export interface UpdateResourceServerRequest {
   description?: string | null;
   identifier: string;
   ouId: string;
+  authorizationEngine?: string;
+  externalPDPConnectionId?: string;
 }
 
 export interface CreateResourceRequest {

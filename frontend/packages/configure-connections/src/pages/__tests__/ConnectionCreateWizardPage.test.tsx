@@ -289,10 +289,10 @@ describe('ConnectionCreateWizardPage', () => {
     expect(screen.queryByTestId('custom-step')).not.toBeInTheDocument();
   });
 
-  it('shows four type cards including trusted-idp', () => {
+  it('shows five type cards including trusted-idp', () => {
     render(<ConnectionCreateWizardPage />);
 
-    expect(screen.getAllByTestId(/^connection-type-option-/)).toHaveLength(4);
+    expect(screen.getAllByTestId(/^connection-type-option-/)).toHaveLength(5);
     expect(screen.getByTestId('connection-type-option-trusted-idp')).toBeInTheDocument();
   });
 });

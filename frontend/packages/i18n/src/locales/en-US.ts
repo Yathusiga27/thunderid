@@ -1806,6 +1806,7 @@ const translations = {
     'categories.identity-verification': 'Identity Verification',
     'categories.crm': 'CRM',
     'categories.data-store': 'Data store',
+    'categories.authorization': 'Authorization',
     'categories.trusted-idp': 'Trusted Token Issuer',
     'categories.custom': 'Custom',
 
@@ -1824,6 +1825,7 @@ const translations = {
     'vendor.twilio.description': 'Send SMS one-time passcodes via Twilio.',
     'vendor.vonage.description': 'Deliver SMS and email passcodes through Vonage.',
     'vendor.sms-gateway.description': 'Route SMS through your own HTTP gateway.',
+    'vendor.external-authzen-pdp.description': 'Delegate authorization decisions to an AuthZEN-compatible PDP.',
     'vendor.trustedIdp.description': 'Trusted token issuer for token exchange and ID-JAG.',
 
     // Add custom connection wizard
@@ -1843,6 +1845,10 @@ const translations = {
     'wizard.type.sms.label': 'SMS gateway',
     'wizard.type.sms.description': 'Route SMS through your own HTTP gateway.',
     'wizard.type.sms.tag': 'Message sender · SMS',
+    'wizard.type.externalAuthzenPdp.label': 'External AuthZEN PDP',
+    'wizard.type.externalAuthzenPdp.description':
+      'Call an external AuthZEN-compatible policy decision point for authorization evaluation.',
+    'wizard.type.externalAuthzenPdp.tag': 'Authorization · PDP',
     'wizard.type.trustedIdp.label': 'Trusted Token Issuer',
     'wizard.type.trustedIdp.description':
       "Trust an external IdP's identity assertions and exchange them for access tokens.",
@@ -1851,8 +1857,7 @@ const translations = {
     'wizard.name.fieldLabel': 'Connection name',
     'wizard.name.placeholder': 'Enter your connection name',
     'wizard.configure.heading': 'Configure your connection',
-    'wizard.configure.subheading':
-      'Enter the credentials and endpoints for your custom connection. Secrets are stored write-only.',
+    'wizard.configure.subheading': 'Configure the connection settings below.',
     'wizard.configure.redirectHint':
       'Register the redirect URI below with your identity provider as an allowed callback URL, then enter the credentials and endpoints it gives you.',
 
@@ -1871,13 +1876,14 @@ const translations = {
     'detail.notFound.description': 'This connection may have been deleted or the link is incorrect.',
     'detail.tabs.general': 'General',
     'detail.tabs.attributeMapping': 'Attribute Configuration',
+    'detail.tabs.subjectMapping': 'Attribute Configuration',
     'detail.tabs.advanced': 'Advanced',
     'detail.quickCopy.title': 'Quick copy',
     'detail.quickCopy.description': 'Copy connection identifiers for use in your integration.',
     'detail.connectionId': 'Connection ID',
     'detail.connectionId.hint': 'Unique identifier for this connection.',
-    'detail.credentials.title': 'Credentials',
-    'detail.credentials.description': 'Credentials and endpoints for this connection. Secrets are stored write-only.',
+    'detail.credentials.title': 'Connection details',
+    'detail.credentials.description': 'Provide the details ThunderID needs to connect to this service.',
     'detail.dangerZone.title': 'Danger zone',
     'detail.dangerZone.description': 'Actions in this section are irreversible. Proceed with caution.',
     'detail.dangerZone.delete.title': 'Delete connection',
@@ -1949,6 +1955,34 @@ const translations = {
     'form.fields.httpHeaders.hint':
       'Optional headers sent with every request. Commas are not supported in a name or value.',
     'form.fields.httpHeaders.add': 'Add header',
+    'form.fields.authzenEndpoint.label': 'AuthZEN configuration endpoint',
+    'form.fields.timeoutMs.label': 'Timeout in milliseconds',
+    'form.fields.timeoutMs.hint': 'Maximum time ThunderID waits for one PDP request.',
+    'form.fields.retryCount.label': 'Retry count',
+    'form.fields.retryCount.hint': 'Number of retries for transient PDP or network failures.',
+    'subjectMapping.attributes.title': 'Subject attribute mapping',
+    'subjectMapping.attributes.description':
+      'Choose the additional user attributes this PDP needs and optionally rename them for the AuthZEN request.',
+    'subjectMapping.selected.title': 'Selected attributes',
+    'subjectMapping.attributes.userType.label': 'User type',
+    'subjectMapping.attributes.userType.placeholder': 'Select a user type',
+    'subjectMapping.attributes.label': 'Allowed subject attributes',
+    'subjectMapping.attributes.placeholder': 'email department riskScore',
+    'subjectMapping.attributes.hint':
+      'Select known user attributes or type custom runtime attributes. Leave empty to send only the default subject fields.',
+    'subjectMapping.mappings.title': 'Attribute Mappings',
+    'subjectMapping.mappings.description':
+      'Map ThunderID subject attribute names to the attribute names expected by the external PDP.',
+    'subjectMapping.mappings.label': 'Additional attributes',
+    'subjectMapping.mappings.hint':
+      'Select extra user attributes to include in the PDP request. The PDP attribute is optional and is only needed when the PDP expects a different name.',
+    'subjectMapping.mappings.thunderIdAttribute': 'ThunderID Attribute',
+    'subjectMapping.mappings.pdpAttribute': 'PDP Attribute',
+    'subjectMapping.mappings.pdpAttributeOptional': 'PDP Attribute (optional)',
+    'subjectMapping.mappings.thunderIdPlaceholder': 'e.g. email',
+    'subjectMapping.mappings.add': 'Add Mapping',
+    'subjectMapping.mappings.addUserType': 'Add User Type',
+    'subjectMapping.mappings.remove': 'Remove',
     'form.keyValue.name': 'Name',
     'form.keyValue.value': 'Value',
     'form.keyValue.add': 'Add',
@@ -2008,6 +2042,7 @@ const translations = {
     'delete.title': 'Delete connection',
     'delete.message': 'Are you sure you want to delete “{{name}}”? This action cannot be undone.',
     'delete.usages.loading': 'Checking affected resources…',
+    'delete.usages.error': 'Failed to check connection usage. Please try again.',
     'delete.usages.more': '+{{count}} more',
     'delete.blocking.title': 'This connection cannot be deleted until the following resources are updated or removed:',
 

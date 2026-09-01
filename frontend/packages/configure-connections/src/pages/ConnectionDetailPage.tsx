@@ -17,10 +17,11 @@ import AttributeMappingSection from '../components/AttributeMappingSection';
 import ConnectionDeleteDialog from '../components/ConnectionDeleteDialog';
 import ConnectionForm from '../components/ConnectionForm';
 import ReadOnlyCopyField from '../components/ReadOnlyCopyField';
+import SubjectMappingSection, {type SubjectMappingValues} from '../components/SubjectMappingSection';
 import {CONNECTION_FORM_FIELDS} from '../config/connectionFormFields';
 import {VENDOR_META_BY_TYPE} from '../config/connectionVendorMeta';
 import useConnectionRoutes from '../hooks/useConnectionRoutes';
-import type {AttributeConfiguration, ConnectionType} from '../models/connection';
+import {ConnectionTypes, type AttributeConfiguration, type ConnectionType} from '../models/connection';
 import {
   type ConnectionFormValues,
   formValuesToRequest,
@@ -75,6 +76,7 @@ export default function ConnectionDetailPage(): JSX.Element | null {
   const meta = VENDOR_META_BY_TYPE[connectionType];
   const isCustom: boolean = meta?.presentation === 'custom';
   const supportsAttributes: boolean = meta?.supportsAttributeMapping ?? false;
+  const supportsSubjectMapping: boolean = connectionType === ConnectionTypes.EXTERNAL_AUTHZEN_PDP;
 
   // Branded vendors are singletons and route without an id — resolve the single instance.
   const instancesQuery = useConnectionInstances(connectionType, {enabled: Boolean(meta) && !id});
@@ -83,6 +85,7 @@ export default function ConnectionDetailPage(): JSX.Element | null {
 
   const [activeTab, setActiveTab] = useState(0);
   const [editedValues, setEditedValues] = useState<ConnectionFormValues>({});
+  const [editedSubjectMapping, setEditedSubjectMapping] = useState<Partial<SubjectMappingValues>>({});
   const [secretReplacing, setSecretReplacing] = useState(false);
   const [editedAttr, setEditedAttr] = useState<AttributeConfiguration | undefined | null>(null);
   const [attrValid, setAttrValid] = useState(true);
@@ -110,6 +113,11 @@ export default function ConnectionDetailPage(): JSX.Element | null {
     [data, fields, redirectUri],
   );
   const baselineAttr: AttributeConfiguration | undefined = data?.attributeConfiguration;
+  const baselineSubjectMapping: SubjectMappingValues = {
+    subjectProperties: data?.subjectProperties ?? '',
+    subjectPropertyMappings: data?.subjectPropertyMappings ?? '',
+    subjectAttributeMappings: data?.subjectAttributeMappings ?? [],
+  };
 
   if (!meta) {
     return null;
@@ -122,6 +130,7 @@ export default function ConnectionDetailPage(): JSX.Element | null {
 
   const resetEdits = (): void => {
     setEditedValues({});
+    setEditedSubjectMapping({});
     setSecretReplacing(false);
     setEditedAttr(null);
     setAttrValid(true);
@@ -132,8 +141,13 @@ export default function ConnectionDetailPage(): JSX.Element | null {
 
   const formDirty: boolean = JSON.stringify(values) !== JSON.stringify(baseline) || secretReplacing;
   const attrDirty: boolean = editedAttr !== null && canonicalAttr(editedAttr) !== canonicalAttr(baselineAttr);
-  const dirty: boolean = formDirty || attrDirty;
+  const subjectMappingValues: SubjectMappingValues = {...baselineSubjectMapping, ...editedSubjectMapping};
+  const subjectMappingDirty: boolean =
+    supportsSubjectMapping && JSON.stringify(subjectMappingValues) !== JSON.stringify(baselineSubjectMapping);
+  const dirty: boolean = formDirty || attrDirty || subjectMappingDirty;
   const valid: boolean = Object.keys(validateConnectionForm(values, fields, 'edit')).length === 0 && attrValid;
+  const subjectMappingTabIndex = supportsAttributes ? 2 : 1;
+  const advancedTabIndex = 1 + (supportsAttributes ? 1 : 0) + (supportsSubjectMapping ? 1 : 0);
 
   // A save failure is stale once the user edits any field. Only reset the mutation once it has
   // actually failed: resetting while it's still pending would flip isPending back to false and
@@ -155,6 +169,7 @@ export default function ConnectionDetailPage(): JSX.Element | null {
     const payload = {
       ...formValuesToRequest(values, fields, {mode: 'edit', secretReplaced: secretReplacing}),
       ...(supportsAttributes ? {attributeConfiguration: editedAttr ?? baselineAttr} : {}),
+      ...(supportsSubjectMapping ? subjectMappingValues : {}),
     };
     updateMutation
       .mutateAsync(payload)
@@ -268,6 +283,13 @@ export default function ConnectionDetailPage(): JSX.Element | null {
                 data-testid="connection-tab-attributes"
               />
             )}
+            {supportsSubjectMapping && (
+              <Tab
+                label={t('detail.tabs.subjectMapping', 'Attribute Configuration')}
+                sx={{textTransform: 'none'}}
+                data-testid="connection-tab-subject-mapping"
+              />
+            )}
             <Tab
               label={t('detail.tabs.advanced', 'Advanced')}
               sx={{textTransform: 'none'}}
@@ -319,7 +341,19 @@ export default function ConnectionDetailPage(): JSX.Element | null {
             </TabPanel>
           )}
 
-          <TabPanel value={activeTab} index={supportsAttributes ? 2 : 1}>
+          {supportsSubjectMapping && (
+            <TabPanel value={activeTab} index={subjectMappingTabIndex}>
+              <SubjectMappingSection
+                values={subjectMappingValues}
+                onChange={(field, value) => {
+                  clearSaveError();
+                  setEditedSubjectMapping((prev) => ({...prev, [field]: value}));
+                }}
+              />
+            </TabPanel>
+          )}
+
+          <TabPanel value={activeTab} index={advancedTabIndex}>
             <Stack direction="column" spacing={4}>
               <SettingsCard title={t('detail.dangerZone.title')} description={t('detail.dangerZone.description')}>
                 <Typography variant="h6" gutterBottom color="error">

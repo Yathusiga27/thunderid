@@ -16,6 +16,7 @@ describe('SelectConnectionType', () => {
     expect(screen.getByTestId('connection-type-option-oidc')).toBeInTheDocument();
     expect(screen.getByTestId('connection-type-option-oauth')).toBeInTheDocument();
     expect(screen.getByTestId('connection-type-option-trusted-idp')).toBeInTheDocument();
+    expect(screen.getByTestId('connection-type-option-external-authzen-pdp')).toBeInTheDocument();
     expect(screen.getByTestId('connection-type-option-sms-gateway')).toBeInTheDocument();
   });
 

@@ -10,6 +10,7 @@ const ResourceServerQueryKeys = {
   RESOURCE_ACTIONS: 'resource-actions',
   SERVER_CONFIG: 'server-config',
   DEFAULT_RESOURCE_SERVER: 'defaultResourceServer',
+  EXTERNAL_AUTHZEN_PDP_CONNECTIONS: 'externalAuthZENPDPConnections',
 } as const;
 
 export default ResourceServerQueryKeys;

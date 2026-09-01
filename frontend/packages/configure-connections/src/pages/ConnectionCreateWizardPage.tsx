@@ -62,7 +62,7 @@ export default function ConnectionCreateWizardPage(): JSX.Element {
   const fields = CONNECTION_FORM_FIELDS[activeType];
   const createFields = useMemo(() => fieldsForMode(activeType, 'create'), [activeType]);
   const redirectUri = getGateCallbackUrl();
-  const emptyValues = useMemo(() => emptyFormValues(fields, redirectUri), [fields, redirectUri]);
+  const emptyValues = useMemo(() => emptyFormValues(createFields, redirectUri), [createFields, redirectUri]);
 
   // Only federated login providers carry a redirect URI to register with the provider.
   const usesRedirectUri: boolean = fields.some((field) => field.name === 'redirectUri');

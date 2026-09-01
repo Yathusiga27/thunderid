@@ -365,4 +365,5 @@ describe('ConnectionForm', () => {
       expect(onFieldChange).toHaveBeenLastCalledWith('httpHeaders', 'X-ABC: text/html application/json');
     });
   });
+
 });

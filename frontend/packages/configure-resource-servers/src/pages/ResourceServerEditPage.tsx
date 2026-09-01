@@ -81,9 +81,15 @@ export default function ResourceServerEditPage(): JSX.Element {
   const initialTab = searchParams.get('tab') === 'advanced' ? TAB_ADVANCED : TAB_RESOURCES;
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [editedFields, setEditedFields] = useState<Partial<{name: string; description: string; identifier: string}>>(
-    {},
-  );
+  const [editedFields, setEditedFields] = useState<
+    Partial<{
+      name: string;
+      description: string;
+      identifier: string;
+      authorizationEngine: string;
+      externalPDPConnectionId: string;
+    }>
+  >({});
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [tempName, setTempName] = useState('');
@@ -95,7 +101,10 @@ export default function ResourceServerEditPage(): JSX.Element {
     setActiveTab(newValue);
   };
 
-  const handleFieldChange = (field: 'name' | 'description' | 'identifier', value: string): void => {
+  const handleFieldChange = (
+    field: 'name' | 'description' | 'identifier' | 'authorizationEngine' | 'externalPDPConnectionId',
+    value: string,
+  ): void => {
     if (updateRs.isError) {
       updateRs.reset(); // a save error is stale once the form changes
     }
@@ -110,6 +119,8 @@ export default function ResourceServerEditPage(): JSX.Element {
       name: resourceServer?.name,
       description: resourceServer?.description,
       identifier: resourceServer?.identifier,
+      authorizationEngine: resourceServer?.authorizationEngine ?? 'rbac',
+      externalPDPConnectionId: resourceServer?.externalPDPConnectionId,
     };
     return Object.entries(editedFields).some(
       ([key, value]) => !isEqualIgnoringEmpty(norm(value), norm(originalOf[key])),
@@ -139,6 +150,11 @@ export default function ResourceServerEditPage(): JSX.Element {
               : (resourceServer.description ?? null),
           identifier: 'identifier' in editedFields ? nextIdentifier : resourceServer.identifier,
           ouId: resourceServer.ouId,
+          authorizationEngine: editedFields.authorizationEngine ?? resourceServer.authorizationEngine ?? 'rbac',
+          externalPDPConnectionId:
+            'externalPDPConnectionId' in editedFields
+              ? editedFields.externalPDPConnectionId
+              : (resourceServer.externalPDPConnectionId ?? ''),
         },
       },
       {
@@ -397,7 +413,16 @@ export default function ResourceServerEditPage(): JSX.Element {
           key={resourceServer.id}
           resourceServer={resourceServer}
           identifier={editedFields.identifier ?? resourceServer.identifier ?? ''}
+          authorizationEngine={editedFields.authorizationEngine ?? resourceServer.authorizationEngine ?? 'rbac'}
+          externalPDPConnectionId={editedFields.externalPDPConnectionId ?? resourceServer.externalPDPConnectionId ?? ''}
           onIdentifierChange={(v) => handleFieldChange('identifier', v)}
+          onAuthorizationEngineChange={(v) => {
+            handleFieldChange('authorizationEngine', v);
+            if (v !== 'external_authzen_pdp') {
+              handleFieldChange('externalPDPConnectionId', '');
+            }
+          }}
+          onExternalPDPConnectionChange={(v) => handleFieldChange('externalPDPConnectionId', v)}
         />
 
         {!resourceServer.isReadOnly && (

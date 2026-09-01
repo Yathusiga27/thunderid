@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {Box, Card, CardContent, Chip, Stack, Typography} from '@wso2/oxygen-ui';
-import {CircleCheck, KeyRound, MessagesSquare, ShieldCheck} from '@wso2/oxygen-ui-icons-react';
+import {CircleCheck, KeyRound, MessagesSquare, ServerCog, ShieldCheck} from '@wso2/oxygen-ui-icons-react';
 import type {JSX} from 'react';
 import {useTranslation} from 'react-i18next';
 import {type ConnectionType, ConnectionTypes} from '../../models/connection';
@@ -67,6 +67,17 @@ export default function SelectConnectionType({selectedType, onSelect}: SelectCon
       tagKey: 'wizard.type.trustedIdp.tag',
       tagDefault: 'Token exchange · ID-JAG',
       icon: <ShieldCheck size={28} />,
+      comingSoon: false,
+    },
+    {
+      type: ConnectionTypes.EXTERNAL_AUTHZEN_PDP,
+      labelKey: 'wizard.type.externalAuthzenPdp.label',
+      labelDefault: 'External AuthZEN PDP',
+      descriptionKey: 'wizard.type.externalAuthzenPdp.description',
+      descriptionDefault: 'Call an external AuthZEN-compatible policy decision point for authorization evaluation.',
+      tagKey: 'wizard.type.externalAuthzenPdp.tag',
+      tagDefault: 'Authorization · PDP',
+      icon: <ServerCog size={28} />,
       comingSoon: false,
     },
     {
