@@ -335,7 +335,7 @@ export default function OAuth2ConfigSection({
               ) : (
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                   {selected.map((v) => (
-                    <Chip key={v} label={v} size="small" />
+                    <Chip key={v} label={getGrantTypeLabel(v, t)} size="small" />
                   ))}
                 </Stack>
               )

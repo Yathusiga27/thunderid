@@ -189,6 +189,10 @@ func (s *flowExecService) execute(ctx context.Context, flowID, appID, executionI
 				flowStep.Data.AdditionalData = make(map[string]string)
 			}
 			flowStep.Data.AdditionalData[common.DataCallbackType] = callbackType
+			if callbackType == string(providers.GrantTypeDeviceCode) {
+				flowStep.Data.AdditionalData[common.DataAuthID] =
+					engineCtx.RuntimeData[common.RuntimeKeyAuthorizationRequestID]
+			}
 		}
 	}
 
@@ -670,7 +674,8 @@ func (s *flowExecService) setApplicationToContext(engineCtx *EngineContext,
 	logger *log.Logger) *tidcommon.ServiceError {
 	// Skip application loading for app-independent flows
 	if engineCtx.FlowType == providers.FlowTypeUserOnboarding ||
-		engineCtx.FlowType == providers.FlowTypeAdministration {
+		engineCtx.FlowType == providers.FlowTypeAdministration ||
+		engineCtx.FlowType == providers.FlowTypeSystem {
 		return nil
 	}
 
@@ -793,7 +798,7 @@ func (s *flowExecService) encryptEngineContext(ctx context.Context, engineCtx *E
 func (s *flowExecService) getFlowGraph(ctx context.Context, appID string, flowType providers.FlowType,
 	logger *log.Logger) (string, *tidcommon.ServiceError) {
 	// Handle app-independent system flows
-	if flowType == providers.FlowTypeUserOnboarding {
+	if flowType == providers.FlowTypeUserOnboarding || flowType == providers.FlowTypeSystem {
 		return s.getSystemFlowGraph(ctx, flowType, logger)
 	}
 
@@ -859,7 +864,8 @@ func (s *flowExecService) getFlowGraph(ctx context.Context, appID string, flowTy
 func validateFlowType(flowTypeStr string) (providers.FlowType, *tidcommon.ServiceError) {
 	switch providers.FlowType(flowTypeStr) {
 	case providers.FlowTypeAuthentication, providers.FlowTypeRegistration, providers.FlowTypeUserOnboarding,
-		providers.FlowTypeRecovery, providers.FlowTypeSignOut, providers.FlowTypeAdministration:
+		providers.FlowTypeRecovery, providers.FlowTypeSignOut, providers.FlowTypeAdministration,
+		providers.FlowTypeSystem:
 		return providers.FlowType(flowTypeStr), nil
 	default:
 		return "", &ErrorInvalidFlowType
@@ -876,11 +882,20 @@ func (s *flowExecService) getSystemFlowGraph(ctx context.Context, flowType provi
 	logger *log.Logger) (string, *tidcommon.ServiceError) {
 	switch flowType {
 	case providers.FlowTypeUserOnboarding:
+	case providers.FlowTypeSystem:
+		systemFlow := systemFlowFromContext(ctx)
+		if systemFlow != "" && systemFlow != SystemFlowDeviceGrant {
+			return "", &ErrorInvalidFlowType
+		}
 	default:
 		return "", &ErrorInvalidFlowType
 	}
 
 	handle := s.resolveDefaultFlowHandle(ctx, flowType)
+	if handle == "" {
+		logger.Error(ctx, "System flow handle is not configured", log.String("flowType", string(flowType)))
+		return "", &tidcommon.InternalServerError
+	}
 
 	flow, err := s.flowProvider.GetFlowByHandle(ctx, handle, flowType)
 	if err != nil {
@@ -952,8 +967,9 @@ func (s *flowExecService) InitiateFlow(ctx context.Context,
 		return "", svcErr
 	}
 
-	// Application ID is required for all flows except Invite Registration
-	if flowType != providers.FlowTypeUserOnboarding && initContext.ApplicationID == "" {
+	// Application-independent flows do not need an application ID at initiation.
+	if flowType != providers.FlowTypeUserOnboarding && flowType != providers.FlowTypeSystem &&
+		initContext.ApplicationID == "" {
 		return "", &ErrorInvalidFlowInitContext
 	}
 
@@ -1011,7 +1027,8 @@ func (s *flowExecService) InitiateAndExecute(ctx context.Context,
 		return nil, svcErr
 	}
 
-	if flowType != providers.FlowTypeUserOnboarding && initContext.ApplicationID == "" {
+	if flowType != providers.FlowTypeUserOnboarding && flowType != providers.FlowTypeSystem &&
+		initContext.ApplicationID == "" {
 		return nil, &ErrorInvalidFlowInitContext
 	}
 
@@ -1116,6 +1133,8 @@ func (s *flowExecService) getFlowExpirySeconds(ctx context.Context, flowType pro
 		return firstPositiveExpiry(cfg.RegistrationFlow.ExpirySeconds, defaultRegistrationFlowExpiry)
 	case providers.FlowTypeUserOnboarding:
 		return firstPositiveExpiry(cfg.UserOnboardingFlow.ExpirySeconds, defaultUserOnboardingFlowExpiry)
+	case providers.FlowTypeSystem:
+		return firstPositiveExpiry(cfg.DeviceGrantFlow.ExpirySeconds, defaultAuthFlowExpiry)
 	case providers.FlowTypeRecovery:
 		return firstPositiveExpiry(cfg.RecoveryFlow.ExpirySeconds, defaultRecoveryFlowExpiry)
 	case providers.FlowTypeSignOut:
@@ -1137,6 +1156,8 @@ func (s *flowExecService) resolveDefaultFlowHandle(ctx context.Context, flowType
 		return cfg.RegistrationFlow.DefaultHandle
 	case providers.FlowTypeUserOnboarding:
 		return cfg.UserOnboardingFlow.DefaultHandle
+	case providers.FlowTypeSystem:
+		return cfg.DeviceGrantFlow.DefaultHandle
 	case providers.FlowTypeRecovery:
 		return cfg.RecoveryFlow.DefaultHandle
 	case providers.FlowTypeSignOut:
