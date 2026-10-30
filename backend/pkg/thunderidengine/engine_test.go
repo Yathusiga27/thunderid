@@ -112,6 +112,7 @@ func validEngineContext(t *testing.T) *engineContext {
 	return &engineContext{
 		serverHome:            "/tmp/server",
 		serverConfig:          engineconfig.ServerConfig{Identifier: "test-server"},
+		encryptionConfig:      engineconfig.EncryptionConfig{Key: "test-encryption-key"},
 		observabilitySvc:      newTestObservabilityProvider(t),
 		authzProvider:         newTestAuthzProvider(t),
 		actorProvider:         actorprovidermock.NewActorProviderMock(t),
@@ -142,6 +143,28 @@ func (suite *EngineTestSuite) TestValidateEngineContext() {
 		ctx := validEngineContext(t)
 		ctx.serverHome = ""
 		assert.ErrorContains(t, validateEngineContext(ctx), "server home directory")
+	})
+
+	suite.T().Run("Device Grant requires an encryption key", func(t *testing.T) {
+		ctx := validEngineContext(t)
+		ctx.encryptionConfig.Key = ""
+		assert.ErrorContains(t, validateEngineContext(ctx),
+			"encryption key is required when Device Code grant is enabled")
+	})
+
+	suite.T().Run("explicitly enabled Device Grant requires an encryption key", func(t *testing.T) {
+		ctx := validEngineContext(t)
+		ctx.encryptionConfig.Key = ""
+		ctx.oauthConfig.AllowedGrantTypes = []string{string(providers.GrantTypeDeviceCode)}
+		assert.ErrorContains(t, validateEngineContext(ctx),
+			"encryption key is required when Device Code grant is enabled")
+	})
+
+	suite.T().Run("encryption key is optional when Device Grant is disabled", func(t *testing.T) {
+		ctx := validEngineContext(t)
+		ctx.encryptionConfig.Key = ""
+		ctx.oauthConfig.AllowedGrantTypes = []string{"client_credentials"}
+		assert.NoError(t, validateEngineContext(ctx))
 	})
 
 	suite.T().Run("missing server identifier", func(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/thunder-id/thunderid/internal/agentmgtprovider"
@@ -26,6 +27,7 @@ import (
 	"github.com/thunder-id/thunderid/internal/flow/interceptor"
 	"github.com/thunder-id/thunderid/internal/oauth"
 	oauthconfig "github.com/thunder-id/thunderid/internal/oauth/config"
+	"github.com/thunder-id/thunderid/internal/oauth/oauth2/deviceauth"
 	"github.com/thunder-id/thunderid/internal/oauth/oauth2/dpop"
 	"github.com/thunder-id/thunderid/internal/oauth/oauth2/jti"
 	"github.com/thunder-id/thunderid/internal/oauth/oauth2/revocation"
@@ -166,6 +168,7 @@ func New(mux *http.ServeMux, opts ...Option) *Engine {
 		JWT:                        engineCtx.jwtConfig,
 		OAuth:                      engineCtx.oauthConfig,
 		GateClient:                 engineCtx.gateClientConfig,
+		DeviceAuthUserCodeIndexKey: []byte(engineCtx.encryptionConfig.Key),
 		EnableOUQualifiedEndpoints: engineCtx.serverConfig.EnableOUQualifiedEndpoints,
 	}
 	// With no SSO session store there is no session termination to deliver, so back-channel logout is
@@ -226,11 +229,13 @@ func New(mux *http.ServeMux, opts ...Option) *Engine {
 	engineCtx.graphBuilder = graphbuilder.Initialize(engineCtx.flowFactory, engineCtx.execRegistry,
 		engineCtx.interceptorRegistry, graphCache)
 
+	deviceGrantResolver := deviceauth.NewUserCodeVerifier(engineCtx.runtimeStoreProvider,
+		oauthConfig.DeviceAuthUserCodeIndexKey)
 	engineCtx.flowExecService, err = flowexec.Initialize(mux, engineCtx.flowProvider, engineCtx.actorProvider,
 		engineCtx.execRegistry, engineCtx.interceptorRegistry, engineCtx.observabilitySvc,
 		engineCtx.runtimeCryptoSvc, engineCtx.attestationProvider, engineCtx.graphBuilder,
 		engineCtx.jwtService, engineCtx.runtimeStoreProvider, engineCtx.transactioner, nil, nil,
-		engineCtx.identityGovernance, nil, flowConfig)
+		engineCtx.identityGovernance, nil, deviceGrantResolver, flowConfig)
 	if err != nil {
 		logger.Fatal(ctx, "Failed to initialize flow execution service", log.Error(err))
 	}
@@ -278,6 +283,11 @@ func New(mux *http.ServeMux, opts ...Option) *Engine {
 
 // validateEngineContext checks that the engine context has all required fields set.
 func validateEngineContext(ctx *engineContext) error {
+	deviceGrantEnabled := len(ctx.oauthConfig.AllowedGrantTypes) == 0 ||
+		slices.Contains(ctx.oauthConfig.AllowedGrantTypes, string(providers.GrantTypeDeviceCode))
+	if deviceGrantEnabled && ctx.encryptionConfig.Key == "" {
+		return errors.New("thunderidengine: encryption key is required when Device Code grant is enabled")
+	}
 	if ctx.serverHome == "" {
 		return errors.New("thunderidengine: server home directory is not set")
 	}
